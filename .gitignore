@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Generated / temporary
+_check.js
+*.log
+
+# Local user data (don't ship saved circuits in the repo)
+circuits/*.json
+
+# Large trained models — too big for git, regenerate from CSV on first run.
+# Use Git LFS if you need to ship them, OR document re-training.
+ml_models/saved/*.pkl
+ml_models/saved/
+
+# Editor / tooling caches
+.claude/
+
+# Stray empty files from earlier shell typos
+/'
+/3
+/AND
+/dict
+/float
+/XOR
+/(intent_label
+/({id
+/{i
+/r('timeout')
+/_single_match_len
+/getattr(ml
+/dict
+/' '

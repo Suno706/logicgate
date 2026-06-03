@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.vscode/
+.idea/
+*.log
+_check.js
+circuits/*.json
+# Keep models OUT of the image — they get retrained from CSV on first boot.
+# If you want to bake them in, comment the next line out.
+ml_models/saved/
+# Misc stray files
+/'
+/3
+/AND
+/dict
+/float
+/XOR

@@ -1,15 +1,34 @@
-# Fly.io deployment config — always-on, fast worldwide, generous free tier.
+# Fly.io deploy config — FREE TIER, ALWAYS-ON, WITH PERSISTENT STORAGE
 #
-# 1. Install flyctl: https://fly.io/docs/hands-on/install-flyctl/
-# 2. Run: fly launch --no-deploy   (creates the app, picks a unique name)
-# 3. Run: fly deploy
-# 4. Site is live at https://<app-name>.fly.dev
+# Fly.io's free tier (better than Render's now) includes:
+#   - 3 small VMs (256 MB RAM each, shared CPU) — always-on, no cold starts
+#   - 3 GB persistent volume storage — SQLite database survives forever
+#   - Free HTTPS with auto-cert
+#   - Anycast routing — fast worldwide
 #
-# Free tier covers up to 3 small VMs + 3 GB persistent storage — plenty for
-# this app even with hundreds of users.
+# Requires a credit card for verification but $0 is charged on free tier.
+#
+# Steps:
+#   1. Install flyctl: https://fly.io/docs/hands-on/install-flyctl/
+#        macOS/Linux: curl -L https://fly.io/install.sh | sh
+#        Windows:     iwr https://fly.io/install.ps1 -useb | iex
+#
+#   2. Sign up (free, requires CC):
+#        fly auth signup
+#
+#   3. From this directory:
+#        fly launch --no-deploy           # picks a unique app name
+#        fly secrets set FLASK_SECRET_KEY=$(openssl rand -hex 32)
+#        fly volumes create logicgate_data --size 1 --region iad
+#        fly deploy
+#
+#   4. Your site is live at https://<app-name>.fly.dev
+#
+# (Replace `logicgate` with a unique name on first deploy — `fly launch`
+# will prompt you.)
 
-app = "logicgate"           # CHANGE THIS to a unique name before deploying
-primary_region = "iad"      # us-east-1 region; pick the closest to you
+app = "logicgate"
+primary_region = "iad"       # us-east — pick another region if closer to you
 
 [build]
   dockerfile = "Dockerfile"
@@ -17,21 +36,19 @@ primary_region = "iad"      # us-east-1 region; pick the closest to you
 [http_service]
   internal_port = 5000
   force_https = true
-  auto_stop_machines = false
+  auto_stop_machines = false   # always-on
   auto_start_machines = true
-  min_machines_running = 1     # always-on (no cold starts)
+  min_machines_running = 1
 
 [env]
   FLASK_ENV = "production"
 
-# Persistent storage — circuits, training data, retrained models all survive
-# container restarts.
+# Persistent storage — SQLite database, retrained models, user query log
 [mounts]
   source = "logicgate_data"
   destination = "/app/data"
 
-# Set the secret key once via:
-#   fly secrets set FLASK_SECRET_KEY=$(openssl rand -hex 32)
-# Optionally also:
-#   fly secrets set GOOGLE_CLIENT_ID=...
-#   fly secrets set GOOGLE_CLIENT_SECRET=...
+# Set secrets (NOT in this file — committed to git!) via:
+#   fly secrets set FLASK_SECRET_KEY=<random-hex>
+#   fly secrets set GOOGLE_CLIENT_ID=<your-id>      # optional
+#   fly secrets set GOOGLE_CLIENT_SECRET=<your-secret>  # optional

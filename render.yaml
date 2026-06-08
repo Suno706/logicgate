@@ -1,33 +1,31 @@
-# One-click deploy on Render.com
+# Render.com deploy config — FREE TIER COMPATIBLE
 #
-# 1. Push this repo to GitHub
-# 2. Sign in to https://render.com with GitHub
-# 3. New → Blueprint → connect this repo
-# 4. Render reads render.yaml and provisions everything
-# 5. Your site is live at https://<service-name>.onrender.com
+# Render's free tier no longer supports persistent disks. That means SQLite
+# data (users, circuits, query log) is wiped on every redeploy. Use this
+# for demos / portfolio screenshots. For a real production site:
+#   - Upgrade to Render Starter ($7/mo) and add a `disk:` block, OR
+#   - Switch to Fly.io (see fly.toml) — free tier DOES support volumes
 #
-# The free tier spins down after 15 minutes of inactivity (cold start ~30s on
-# next request). For always-on, upgrade to Starter ($7/mo) — no code changes
-# needed.
+# Steps:
+#   1. Push to GitHub
+#   2. https://render.com → New → Blueprint → pick this repo
+#   3. Click Apply
+#   4. ~3 min later your URL is live: https://<service-name>.onrender.com
 
 services:
   - type: web
     name: logicgate
     env: docker
-    plan: free                      # change to "starter" for always-on
+    plan: free
     healthCheckPath: /api/health
-    disk:
-      name: logicgate-data
-      mountPath: /app/data          # SQLite DB + user query log
-      sizeGB: 1
     envVars:
       - key: PORT
-        value: 10000                # Render injects this; matches our Dockerfile
+        value: 10000
       - key: FLASK_SECRET_KEY
-        generateValue: true         # Random secret per deploy
+        generateValue: true
       - key: FLASK_ENV
         value: production
-      # Optional: set these if you want "Sign in with Google" enabled.
+      # Optional Google sign-in: set these in the Render dashboard if wanted.
       # - key: GOOGLE_CLIENT_ID
       #   sync: false
       # - key: GOOGLE_CLIENT_SECRET

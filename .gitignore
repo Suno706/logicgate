@@ -20,7 +20,21 @@ _check.js
 *.log
 
 # Local user data (don't ship saved circuits in the repo)
+# Keep circuits/examples/ — that's the curated shared gallery.
 circuits/*.json
+circuits/s_*/
+circuits/user_*/
+circuits/u_*/
+circuits/room_*/
+circuits/g_*/
+circuits/default/
+
+# SQLite database (per-deployment user data — never commit)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/user_queries.csv
 
 # Large trained models — too big for git, regenerate from CSV on first run.
 # Use Git LFS if you need to ship them, OR document re-training.
@@ -29,6 +43,27 @@ ml_models/saved/
 
 # Editor / tooling caches
 .claude/
+
+# Test / debug scripts created during dev
+_stress_nl.py
+_check_seg.py
+_trace.py
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# React / Node (for future frontend/ folder)
+node_modules/
+dist/
+.vite/
+*.log
+
+# Environment files (never commit secrets)
+.env
+.env.local
+.env.*.local
 
 # Stray empty files from earlier shell typos
 /'
@@ -45,3 +80,7 @@ ml_models/saved/
 /getattr(ml
 /dict
 /' '
+ERR
+Together
+tau
+{n}

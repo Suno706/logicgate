@@ -1,27 +1,40 @@
-# LogicGate — production container image
-# Build:  docker build -t logicgate .
-# Run:    docker run -p 5000:5000 logicgate
-# Deploy: works on any host that runs Docker (Fly.io, Render, Railway,
-#         DigitalOcean App Platform, AWS ECS, your own VPS, ...).
-FROM python:3.11-slim
+# ── Stage 1: Build the React frontend ─────────────────────────────────────────
+FROM node:22-alpine AS frontend-builder
+
+WORKDIR /build/frontend
+COPY frontend/package*.json ./
+RUN npm ci --prefer-offline
+COPY frontend/ ./
+RUN npm run build
+
+# ── Stage 2: Production Python image ──────────────────────────────────────────
+FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=5000 \
-    FLASK_DEBUG=0
+    FLASK_ENV=production
 
 WORKDIR /app
 
-# Install Python deps first so docker layer cache survives source edits.
+# Python dependencies (cached layer)
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
-# Copy the rest of the project. The trained pickles will be re-built on
-# first request if they're missing (each ML class trains-on-load from the
-# CSV). To skip that and bake them in, copy ml_models/saved/ as well.
+# App source (excluding node_modules / __pycache__ etc — see .dockerignore)
 COPY . .
+
+# Embed the pre-built React app so Flask serves it from /frontend/dist
+COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
+
+# Saved circuits persist across restarts via a volume mount
+RUN mkdir -p circuits
 
 EXPOSE 5000
 
-# Use gunicorn (production WSGI) instead of Flask's dev server.
-CMD ["sh", "-c", "gunicorn -w 2 -k gthread --threads 4 --timeout 180 -b 0.0.0.0:${PORT} app:app"]
+# Eventlet-backed gunicorn so Flask-SocketIO's WebSockets work properly.
+# Single worker — Flask-SocketIO uses an in-process roster for presence/rooms.
+# 180 s timeout absorbs the first-request model training if pickles are missing.
+RUN pip install --no-cache-dir eventlet
+CMD ["sh", "-c", "gunicorn -k eventlet -w 1 --timeout 180 -b 0.0.0.0:${PORT} app:app"]

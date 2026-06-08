@@ -1,0 +1,37 @@
+# Fly.io deployment config — always-on, fast worldwide, generous free tier.
+#
+# 1. Install flyctl: https://fly.io/docs/hands-on/install-flyctl/
+# 2. Run: fly launch --no-deploy   (creates the app, picks a unique name)
+# 3. Run: fly deploy
+# 4. Site is live at https://<app-name>.fly.dev
+#
+# Free tier covers up to 3 small VMs + 3 GB persistent storage — plenty for
+# this app even with hundreds of users.
+
+app = "logicgate"           # CHANGE THIS to a unique name before deploying
+primary_region = "iad"      # us-east-1 region; pick the closest to you
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 5000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1     # always-on (no cold starts)
+
+[env]
+  FLASK_ENV = "production"
+
+# Persistent storage — circuits, training data, retrained models all survive
+# container restarts.
+[mounts]
+  source = "logicgate_data"
+  destination = "/app/data"
+
+# Set the secret key once via:
+#   fly secrets set FLASK_SECRET_KEY=$(openssl rand -hex 32)
+# Optionally also:
+#   fly secrets set GOOGLE_CLIENT_ID=...
+#   fly secrets set GOOGLE_CLIENT_SECRET=...

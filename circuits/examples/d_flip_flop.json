@@ -1,0 +1,251 @@
+{
+  "name": "d_flip_flop",
+  "gates": [
+    {
+      "id": "g1",
+      "label": "D",
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 80
+    },
+    {
+      "id": "g2",
+      "label": "CLK",
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 320
+    },
+    {
+      "id": "g3",
+      "type": "NOT",
+      "x": 220,
+      "y": 320
+    },
+    {
+      "id": "g4",
+      "type": "NOT",
+      "x": 220,
+      "y": 80
+    },
+    {
+      "id": "g5",
+      "type": "AND",
+      "x": 360,
+      "y": 80
+    },
+    {
+      "id": "g6",
+      "type": "AND",
+      "x": 360,
+      "y": 200
+    },
+    {
+      "id": "g7",
+      "type": "NOR",
+      "x": 500,
+      "y": 80
+    },
+    {
+      "id": "g8",
+      "type": "NOR",
+      "x": 500,
+      "y": 200
+    },
+    {
+      "id": "g9",
+      "type": "NOT",
+      "x": 640,
+      "y": 80
+    },
+    {
+      "id": "g10",
+      "type": "AND",
+      "x": 780,
+      "y": 80
+    },
+    {
+      "id": "g11",
+      "type": "AND",
+      "x": 780,
+      "y": 200
+    },
+    {
+      "id": "g12",
+      "type": "NOR",
+      "x": 920,
+      "y": 80
+    },
+    {
+      "id": "g13",
+      "type": "NOR",
+      "x": 920,
+      "y": 200
+    },
+    {
+      "id": "g14",
+      "label": "Q_bar",
+      "type": "OUTPUT",
+      "x": 1080,
+      "y": 80
+    },
+    {
+      "id": "g15",
+      "label": "Q",
+      "type": "OUTPUT",
+      "x": 1080,
+      "y": 200
+    }
+  ],
+  "wires": [
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w1",
+      "to_gate": "g3",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w2",
+      "to_gate": "g4",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w3",
+      "to_gate": "g5",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g3",
+      "from_pin": 0,
+      "id": "w4",
+      "to_gate": "g5",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w5",
+      "to_gate": "g6",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g3",
+      "from_pin": 0,
+      "id": "w6",
+      "to_gate": "g6",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g5",
+      "from_pin": 0,
+      "id": "w7",
+      "to_gate": "g7",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g8",
+      "from_pin": 0,
+      "id": "w8",
+      "to_gate": "g7",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g6",
+      "from_pin": 0,
+      "id": "w9",
+      "to_gate": "g8",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g7",
+      "from_pin": 0,
+      "id": "w10",
+      "to_gate": "g8",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g8",
+      "from_pin": 0,
+      "id": "w11",
+      "to_gate": "g9",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g8",
+      "from_pin": 0,
+      "id": "w12",
+      "to_gate": "g10",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w13",
+      "to_gate": "g10",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g9",
+      "from_pin": 0,
+      "id": "w14",
+      "to_gate": "g11",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w15",
+      "to_gate": "g11",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g10",
+      "from_pin": 0,
+      "id": "w16",
+      "to_gate": "g12",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g13",
+      "from_pin": 0,
+      "id": "w17",
+      "to_gate": "g12",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g11",
+      "from_pin": 0,
+      "id": "w18",
+      "to_gate": "g13",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g12",
+      "from_pin": 0,
+      "id": "w19",
+      "to_gate": "g13",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g12",
+      "from_pin": 0,
+      "id": "w20",
+      "to_gate": "g14",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g13",
+      "from_pin": 0,
+      "id": "w21",
+      "to_gate": "g15",
+      "to_pin": 0
+    }
+  ],
+  "description": "Synthesized from: \"D flip flop\""
+}

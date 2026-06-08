@@ -38,6 +38,38 @@ from .intent_data import all_samples
 SAVED_DIR  = os.path.join(os.path.dirname(__file__), 'saved')
 MODEL_PATH = os.path.join(SAVED_DIR, 'intent_classifier.pkl')
 
+# Location of the user-feedback log written by /api/feedback in app.py
+_USER_LOG = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                         'data', 'user_queries.csv')
+
+
+def _load_user_corrections() -> list:
+    """
+    Pull confirmed (text, intent) pairs from data/user_queries.csv.
+
+    A row is treated as a training sample when:
+      • helpful == '1' (the classifier's guess was confirmed by the user), or
+      • corrected_intent is non-empty (the user explicitly relabelled)
+    """
+    import csv
+    if not os.path.exists(_USER_LOG):
+        return []
+    out = []
+    with open(_USER_LOG, 'r', newline='', encoding='utf-8') as f:
+        for row in csv.DictReader(f):
+            q = (row.get('question') or '').strip().lower()
+            if not q:
+                continue
+            corrected = (row.get('corrected_intent') or '').strip()
+            helpful   = row.get('helpful') == '1'
+            if corrected:
+                out.append((q, corrected))
+            elif helpful:
+                intent = row.get('intent', '').strip()
+                if intent:
+                    out.append((q, intent))
+    return out
+
 
 def _build_pipeline() -> Pipeline:
     """TF-IDF (word + char) -> LogisticRegression."""
@@ -75,6 +107,20 @@ class IntentClassifier:
 
     def train(self, verbose: bool = False) -> float:
         data = all_samples()
+
+        # Merge user-supplied corrections — these are queries the user marked
+        # as "helpful" (the classifier's guess was right) or explicitly
+        # corrected the intent on via /api/feedback. Each user-correction
+        # sample is weighted 5× by duplication so it has real influence.
+        try:
+            user_extras = _load_user_corrections()
+            data = data + user_extras * 5
+            if user_extras:
+                print(f'[IntentClassifier] Merging {len(user_extras)} user '
+                      f'corrections (×5 weight = {len(user_extras)*5} samples).')
+        except Exception as e:
+            print(f'[IntentClassifier] Could not load user corrections: {e}')
+
         X = [t for t, _ in data]
         y = [lbl for _, lbl in data]
 

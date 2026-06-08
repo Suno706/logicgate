@@ -1,19 +1,24 @@
 __pycache__/
 *.pyc
+*.pyo
 .git/
 .gitignore
 .vscode/
 .idea/
 *.log
-_check.js
+
+# Node (built by the frontend-builder stage, not needed in Python stage)
+frontend/node_modules/
+
+# Circuit files — persist via volume mount, not baked into the image
 circuits/*.json
-# Keep models OUT of the image — they get retrained from CSV on first boot.
-# If you want to bake them in, comment the next line out.
+
+# ML model pickles — retrained on first boot from CSV
+# Comment out to bake pre-trained models into the image
 ml_models/saved/
-# Misc stray files
-/'
-/3
-/AND
-/dict
-/float
-/XOR
+
+# Dev / test artifacts
+tests/__pycache__/
+.pytest_cache/
+coverage/
+*.egg-info/

@@ -1,0 +1,127 @@
+{
+  "name": "mux_2to1",
+  "gates": [
+    {
+      "id": "g1",
+      "label": "SEL",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 80
+    },
+    {
+      "id": "g2",
+      "label": "D1",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 170
+    },
+    {
+      "id": "g3",
+      "output": null,
+      "type": "AND",
+      "x": 240,
+      "y": 80
+    },
+    {
+      "id": "g4",
+      "output": null,
+      "type": "NOT",
+      "x": 240,
+      "y": 170
+    },
+    {
+      "id": "g5",
+      "label": "D0",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 260
+    },
+    {
+      "id": "g6",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 80
+    },
+    {
+      "id": "g7",
+      "output": null,
+      "type": "OR",
+      "x": 560,
+      "y": 80
+    },
+    {
+      "id": "g8",
+      "label": "2",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 720,
+      "y": 80
+    }
+  ],
+  "wires": [
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w1",
+      "to_gate": "g3",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w2",
+      "to_gate": "g3",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w3",
+      "to_gate": "g4",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w4",
+      "to_gate": "g6",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g5",
+      "from_pin": 0,
+      "id": "w5",
+      "to_gate": "g6",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g3",
+      "from_pin": 0,
+      "id": "w6",
+      "to_gate": "g7",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g6",
+      "from_pin": 0,
+      "id": "w7",
+      "to_gate": "g7",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g7",
+      "from_pin": 0,
+      "id": "w8",
+      "to_gate": "g8",
+      "to_pin": 0
+    }
+  ],
+  "description": "Synthesized from: \"2 to 1 mux\""
+}

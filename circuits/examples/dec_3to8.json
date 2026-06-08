@@ -1,0 +1,449 @@
+{
+  "name": "dec_3to8",
+  "gates": [
+    {
+      "id": "g1",
+      "label": "A",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 80
+    },
+    {
+      "id": "g2",
+      "output": null,
+      "type": "NOT",
+      "x": 240,
+      "y": 80
+    },
+    {
+      "id": "g3",
+      "label": "B",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 170
+    },
+    {
+      "id": "g4",
+      "output": null,
+      "type": "NOT",
+      "x": 240,
+      "y": 170
+    },
+    {
+      "id": "g5",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 80
+    },
+    {
+      "id": "g6",
+      "label": "C",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 260
+    },
+    {
+      "id": "g7",
+      "output": null,
+      "type": "NOT",
+      "x": 240,
+      "y": 260
+    },
+    {
+      "id": "g8",
+      "output": null,
+      "type": "AND",
+      "x": 560,
+      "y": 80
+    },
+    {
+      "id": "g9",
+      "label": "Y0",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 720,
+      "y": 80
+    },
+    {
+      "id": "g10",
+      "output": null,
+      "type": "AND",
+      "x": 560,
+      "y": 170
+    },
+    {
+      "id": "g11",
+      "label": "Y1",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 720,
+      "y": 170
+    },
+    {
+      "id": "g12",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 170
+    },
+    {
+      "id": "g13",
+      "output": null,
+      "type": "AND",
+      "x": 560,
+      "y": 260
+    },
+    {
+      "id": "g14",
+      "label": "Y2",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 720,
+      "y": 260
+    },
+    {
+      "id": "g15",
+      "output": null,
+      "type": "AND",
+      "x": 560,
+      "y": 350
+    },
+    {
+      "id": "g16",
+      "label": "Y3",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 720,
+      "y": 350
+    },
+    {
+      "id": "g17",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 260
+    },
+    {
+      "id": "g18",
+      "output": null,
+      "type": "AND",
+      "x": 560,
+      "y": 440
+    },
+    {
+      "id": "g19",
+      "label": "Y4",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 720,
+      "y": 440
+    },
+    {
+      "id": "g20",
+      "output": null,
+      "type": "AND",
+      "x": 560,
+      "y": 530
+    },
+    {
+      "id": "g21",
+      "label": "Y5",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 720,
+      "y": 530
+    },
+    {
+      "id": "g22",
+      "output": null,
+      "type": "AND",
+      "x": 240,
+      "y": 350
+    },
+    {
+      "id": "g23",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 350
+    },
+    {
+      "id": "g24",
+      "label": "Y6",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 560,
+      "y": 620
+    },
+    {
+      "id": "g25",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 440
+    },
+    {
+      "id": "g26",
+      "label": "Y7",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 560,
+      "y": 710
+    }
+  ],
+  "wires": [
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w1",
+      "to_gate": "g2",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g3",
+      "from_pin": 0,
+      "id": "w2",
+      "to_gate": "g4",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w3",
+      "to_gate": "g5",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w4",
+      "to_gate": "g5",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g6",
+      "from_pin": 0,
+      "id": "w5",
+      "to_gate": "g7",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g5",
+      "from_pin": 0,
+      "id": "w6",
+      "to_gate": "g8",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g7",
+      "from_pin": 0,
+      "id": "w7",
+      "to_gate": "g8",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g8",
+      "from_pin": 0,
+      "id": "w8",
+      "to_gate": "g9",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g5",
+      "from_pin": 0,
+      "id": "w9",
+      "to_gate": "g10",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g6",
+      "from_pin": 0,
+      "id": "w10",
+      "to_gate": "g10",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g10",
+      "from_pin": 0,
+      "id": "w11",
+      "to_gate": "g11",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w12",
+      "to_gate": "g12",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g3",
+      "from_pin": 0,
+      "id": "w13",
+      "to_gate": "g12",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g12",
+      "from_pin": 0,
+      "id": "w14",
+      "to_gate": "g13",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g7",
+      "from_pin": 0,
+      "id": "w15",
+      "to_gate": "g13",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g13",
+      "from_pin": 0,
+      "id": "w16",
+      "to_gate": "g14",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g12",
+      "from_pin": 0,
+      "id": "w17",
+      "to_gate": "g15",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g6",
+      "from_pin": 0,
+      "id": "w18",
+      "to_gate": "g15",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g15",
+      "from_pin": 0,
+      "id": "w19",
+      "to_gate": "g16",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w20",
+      "to_gate": "g17",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w21",
+      "to_gate": "g17",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g17",
+      "from_pin": 0,
+      "id": "w22",
+      "to_gate": "g18",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g7",
+      "from_pin": 0,
+      "id": "w23",
+      "to_gate": "g18",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g18",
+      "from_pin": 0,
+      "id": "w24",
+      "to_gate": "g19",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g17",
+      "from_pin": 0,
+      "id": "w25",
+      "to_gate": "g20",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g6",
+      "from_pin": 0,
+      "id": "w26",
+      "to_gate": "g20",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g20",
+      "from_pin": 0,
+      "id": "w27",
+      "to_gate": "g21",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w28",
+      "to_gate": "g22",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g3",
+      "from_pin": 0,
+      "id": "w29",
+      "to_gate": "g22",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g22",
+      "from_pin": 0,
+      "id": "w30",
+      "to_gate": "g23",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g7",
+      "from_pin": 0,
+      "id": "w31",
+      "to_gate": "g23",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g23",
+      "from_pin": 0,
+      "id": "w32",
+      "to_gate": "g24",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g22",
+      "from_pin": 0,
+      "id": "w33",
+      "to_gate": "g25",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g6",
+      "from_pin": 0,
+      "id": "w34",
+      "to_gate": "g25",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g25",
+      "from_pin": 0,
+      "id": "w35",
+      "to_gate": "g26",
+      "to_pin": 0
+    }
+  ],
+  "description": "Synthesized from: \"3 to 8 decoder\""
+}

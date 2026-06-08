@@ -1,0 +1,584 @@
+{
+  "name": "adder_4bit",
+  "gates": [
+    {
+      "id": "g1",
+      "label": "A0",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 80
+    },
+    {
+      "id": "g2",
+      "label": "B0",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 170
+    },
+    {
+      "id": "g3",
+      "output": null,
+      "type": "XOR",
+      "x": 240,
+      "y": 80
+    },
+    {
+      "id": "g4",
+      "label": "Cin",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 260
+    },
+    {
+      "id": "g5",
+      "output": null,
+      "type": "XOR",
+      "x": 400,
+      "y": 80
+    },
+    {
+      "id": "g6",
+      "label": "S0",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 560,
+      "y": 80
+    },
+    {
+      "id": "g7",
+      "label": "A1",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 350
+    },
+    {
+      "id": "g8",
+      "label": "B1",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 440
+    },
+    {
+      "id": "g9",
+      "output": null,
+      "type": "XOR",
+      "x": 240,
+      "y": 170
+    },
+    {
+      "id": "g10",
+      "output": null,
+      "type": "AND",
+      "x": 240,
+      "y": 260
+    },
+    {
+      "id": "g11",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 170
+    },
+    {
+      "id": "g12",
+      "output": null,
+      "type": "OR",
+      "x": 560,
+      "y": 170
+    },
+    {
+      "id": "g13",
+      "output": null,
+      "type": "XOR",
+      "x": 720,
+      "y": 80
+    },
+    {
+      "id": "g14",
+      "label": "S1",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 880,
+      "y": 80
+    },
+    {
+      "id": "g15",
+      "label": "A2",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 530
+    },
+    {
+      "id": "g16",
+      "label": "B2",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 620
+    },
+    {
+      "id": "g17",
+      "output": null,
+      "type": "XOR",
+      "x": 240,
+      "y": 350
+    },
+    {
+      "id": "g18",
+      "output": null,
+      "type": "AND",
+      "x": 240,
+      "y": 440
+    },
+    {
+      "id": "g19",
+      "output": null,
+      "type": "AND",
+      "x": 720,
+      "y": 170
+    },
+    {
+      "id": "g20",
+      "output": null,
+      "type": "OR",
+      "x": 880,
+      "y": 170
+    },
+    {
+      "id": "g21",
+      "output": null,
+      "type": "XOR",
+      "x": 1040,
+      "y": 80
+    },
+    {
+      "id": "g22",
+      "label": "S2",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 1200,
+      "y": 80
+    },
+    {
+      "id": "g23",
+      "label": "A3",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 710
+    },
+    {
+      "id": "g24",
+      "label": "B3",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 800
+    },
+    {
+      "id": "g25",
+      "output": null,
+      "type": "XOR",
+      "x": 240,
+      "y": 530
+    },
+    {
+      "id": "g26",
+      "output": null,
+      "type": "AND",
+      "x": 240,
+      "y": 620
+    },
+    {
+      "id": "g27",
+      "output": null,
+      "type": "AND",
+      "x": 1040,
+      "y": 170
+    },
+    {
+      "id": "g28",
+      "output": null,
+      "type": "OR",
+      "x": 1200,
+      "y": 170
+    },
+    {
+      "id": "g29",
+      "output": null,
+      "type": "XOR",
+      "x": 1360,
+      "y": 80
+    },
+    {
+      "id": "g30",
+      "label": "S3",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 1520,
+      "y": 80
+    },
+    {
+      "id": "g31",
+      "output": null,
+      "type": "AND",
+      "x": 240,
+      "y": 710
+    },
+    {
+      "id": "g32",
+      "output": null,
+      "type": "AND",
+      "x": 1360,
+      "y": 170
+    },
+    {
+      "id": "g33",
+      "output": null,
+      "type": "OR",
+      "x": 1520,
+      "y": 170
+    },
+    {
+      "id": "g34",
+      "label": "Cout",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 1680,
+      "y": 80
+    }
+  ],
+  "wires": [
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w1",
+      "to_gate": "g3",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w2",
+      "to_gate": "g3",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g3",
+      "from_pin": 0,
+      "id": "w3",
+      "to_gate": "g5",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w4",
+      "to_gate": "g5",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g5",
+      "from_pin": 0,
+      "id": "w5",
+      "to_gate": "g6",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g7",
+      "from_pin": 0,
+      "id": "w6",
+      "to_gate": "g9",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g8",
+      "from_pin": 0,
+      "id": "w7",
+      "to_gate": "g9",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w8",
+      "to_gate": "g10",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w9",
+      "to_gate": "g10",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w10",
+      "to_gate": "g11",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g3",
+      "from_pin": 0,
+      "id": "w11",
+      "to_gate": "g11",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g10",
+      "from_pin": 0,
+      "id": "w12",
+      "to_gate": "g12",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g11",
+      "from_pin": 0,
+      "id": "w13",
+      "to_gate": "g12",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g9",
+      "from_pin": 0,
+      "id": "w14",
+      "to_gate": "g13",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g12",
+      "from_pin": 0,
+      "id": "w15",
+      "to_gate": "g13",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g13",
+      "from_pin": 0,
+      "id": "w16",
+      "to_gate": "g14",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g15",
+      "from_pin": 0,
+      "id": "w17",
+      "to_gate": "g17",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g16",
+      "from_pin": 0,
+      "id": "w18",
+      "to_gate": "g17",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g7",
+      "from_pin": 0,
+      "id": "w19",
+      "to_gate": "g18",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g8",
+      "from_pin": 0,
+      "id": "w20",
+      "to_gate": "g18",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g12",
+      "from_pin": 0,
+      "id": "w21",
+      "to_gate": "g19",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g9",
+      "from_pin": 0,
+      "id": "w22",
+      "to_gate": "g19",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g18",
+      "from_pin": 0,
+      "id": "w23",
+      "to_gate": "g20",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g19",
+      "from_pin": 0,
+      "id": "w24",
+      "to_gate": "g20",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g17",
+      "from_pin": 0,
+      "id": "w25",
+      "to_gate": "g21",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g20",
+      "from_pin": 0,
+      "id": "w26",
+      "to_gate": "g21",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g21",
+      "from_pin": 0,
+      "id": "w27",
+      "to_gate": "g22",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g23",
+      "from_pin": 0,
+      "id": "w28",
+      "to_gate": "g25",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g24",
+      "from_pin": 0,
+      "id": "w29",
+      "to_gate": "g25",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g15",
+      "from_pin": 0,
+      "id": "w30",
+      "to_gate": "g26",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g16",
+      "from_pin": 0,
+      "id": "w31",
+      "to_gate": "g26",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g20",
+      "from_pin": 0,
+      "id": "w32",
+      "to_gate": "g27",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g17",
+      "from_pin": 0,
+      "id": "w33",
+      "to_gate": "g27",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g26",
+      "from_pin": 0,
+      "id": "w34",
+      "to_gate": "g28",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g27",
+      "from_pin": 0,
+      "id": "w35",
+      "to_gate": "g28",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g25",
+      "from_pin": 0,
+      "id": "w36",
+      "to_gate": "g29",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g28",
+      "from_pin": 0,
+      "id": "w37",
+      "to_gate": "g29",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g29",
+      "from_pin": 0,
+      "id": "w38",
+      "to_gate": "g30",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g23",
+      "from_pin": 0,
+      "id": "w39",
+      "to_gate": "g31",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g24",
+      "from_pin": 0,
+      "id": "w40",
+      "to_gate": "g31",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g28",
+      "from_pin": 0,
+      "id": "w41",
+      "to_gate": "g32",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g25",
+      "from_pin": 0,
+      "id": "w42",
+      "to_gate": "g32",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g31",
+      "from_pin": 0,
+      "id": "w43",
+      "to_gate": "g33",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g32",
+      "from_pin": 0,
+      "id": "w44",
+      "to_gate": "g33",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g33",
+      "from_pin": 0,
+      "id": "w45",
+      "to_gate": "g34",
+      "to_pin": 0
+    }
+  ],
+  "description": "Synthesized from: \"4 bit ripple carry adder\""
+}

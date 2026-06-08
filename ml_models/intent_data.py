@@ -26,22 +26,70 @@ import random
 VERBS_BUILD = [
     'build', 'make', 'design', 'create', 'construct', 'generate',
     'give me', 'show me', 'draw', 'wire up', 'i want', 'i need',
+    'put together', 'synthesize', 'assemble', 'lay out', 'sketch',
+    'render', 'produce', 'plot', 'set up', 'implement',
 ]
-ARTICLES   = ['', 'a ', 'an ', 'the ']
+ARTICLES   = ['', 'a ', 'an ', 'the ', 'some ', 'this ']
 CIRCUITS   = [
-    'half adder', 'full adder', '4-bit adder', '8-bit adder',
-    '2-to-1 mux', '4-to-1 mux', '8-to-1 mux',
-    '2-to-4 decoder', '3-to-8 decoder', '4-to-2 encoder',
-    'priority encoder', 'comparator', 'magnitude comparator',
-    'SR latch', 'D flip-flop', 'JK flip-flop', 'T flip-flop',
-    'shift register', 'ring counter', 'parity generator',
-    'majority voter', 'half subtractor', 'full subtractor',
-    'XOR gate', 'NAND gate', 'NOR gate', 'AND gate', 'OR gate',
+    # ── Arithmetic
+    'half adder', 'full adder', '4-bit adder', '8-bit adder', '16-bit adder',
+    '2-bit adder', '3-bit adder', 'ripple carry adder', 'carry-lookahead adder',
+    'half subtractor', 'full subtractor', '4-bit subtractor',
+    'binary multiplier', '2-bit multiplier',
+
+    # ── Multiplexers / demuxes
+    '2-to-1 mux', '4-to-1 mux', '8-to-1 mux', '16-to-1 mux',
+    '1-to-2 demux', '1-to-4 demux', '1-to-8 demux',
+
+    # ── Decoders / encoders
+    '2-to-4 decoder', '3-to-8 decoder', '4-to-16 decoder',
+    'BCD to 7-segment decoder', 'BCD decoder',
+    '4-to-2 encoder', '8-to-3 encoder', 'priority encoder',
+
+    # ── Comparators
+    'comparator', 'magnitude comparator', '2-bit comparator',
+    '4-bit comparator', 'equality comparator',
+
+    # ── Sequential / storage
+    'SR latch', 'D latch', 'gated D latch',
+    'D flip-flop', 'JK flip-flop', 'T flip-flop', 'master-slave flip-flop',
+    'edge-triggered D flip-flop',
+    'shift register', 'SIPO shift register', 'PIPO shift register',
+    'ring counter', 'Johnson counter',
+    '4-bit register', '8-bit register',
+    'mod-8 counter', 'mod-10 counter', 'BCD counter',
+    'up counter', 'down counter', 'up-down counter',
+    'asynchronous counter', 'synchronous counter',
+
+    # ── Misc combinational
+    'parity generator', 'odd parity generator', 'even parity generator',
+    'parity checker', 'majority voter', '3-input majority circuit',
+    'XOR gate', 'XNOR gate', 'NAND gate', 'NOR gate',
+    'AND gate', 'OR gate', 'NOT gate',
+    'buffer', 'tristate buffer',
+
+    # ── ALU bits
+    '1-bit ALU', '4-bit ALU', 'adder-subtractor',
+
+    # ── Combinational tasks (NL phrasings)
+    'circuit that outputs 1 when all inputs are 1',
+    'circuit that outputs 1 when any input is 1',
+    'circuit that detects when exactly two inputs are 1',
+    'circuit that outputs 1 for odd parity',
+    'circuit that outputs 1 when A equals B',
+    'circuit that outputs 1 when A is greater than B',
+    'circuit that detects 101 pattern',
+    'voting circuit for 3 inputs',
 ]
-GATE_SETS  = ['NAND', 'NOR', 'AOI', 'AND-OR-NOT']
+GATE_SETS  = ['NAND', 'NOR', 'AOI', 'AND-OR-NOT', 'AND-NOT', 'OR-NOT',
+              'NAND only', 'NOR only', 'universal NAND', 'universal NOR']
 EXPRESSIONS= [
-    'A and B', 'A or B', 'not A', 'A xor B', 'A and not B',
-    'A & B | ~C', '(A | B) & ~C', 'A ^ B ^ C', '~(A & B)',
+    'A and B', 'A or B', 'not A', 'A xor B', 'A and not B', 'not A or B',
+    'A & B | ~C', '(A | B) & ~C', 'A ^ B ^ C', '~(A & B)', '~(A | B)',
+    'A & B & C', 'A | B | C', '(A ^ B) & C', '~A & ~B & ~C',
+    '(A | B) & (C | D)', 'A ^ B ^ C ^ D', '(A & B) | (C & D)',
+    'A nand B', 'A nor B', '(A xor B) or C', 'A implies B',
+    'not (A or B)', 'A and B and C', '(not A) and B', 'A or not B',
 ]
 
 VARS       = ['A', 'B', 'C', 'D', 'X', 'Y', 'Z']
@@ -84,6 +132,77 @@ def _build_samples():
         out.append((f'output 1 for inputs {triple}', 'build'))
         out.append((f'minterms {triple}', 'build'))
         out.append((f'Y=1 for {triple}, else 0', 'build'))
+
+    # ── Complex specification phrasings ──────────────────────────────────────
+    # These are the kinds of queries an analyst / SDE actually types — multi-input
+    # circuits with a behaviour described by "when ... then ..." or by counting
+    # how many inputs are high.
+    INPUT_COUNTS = ['2', '3', '4', '5', '6', 'three', 'four', 'five', 'six']
+    BEHAVIOURS = [
+        ('when all inputs are 1 the output is 0', 'build'),
+        ('when all inputs are high output is 0',  'build'),
+        ('when every input is 1 output is 0',     'build'),
+        ('output is 0 when all inputs are 1',     'build'),
+        ('output is 1 when all inputs are 0',     'build'),
+        ('output is 1 when any input is high',    'build'),
+        ('output is 1 when at least one input is 1', 'build'),
+        ('output is 1 when exactly one input is 1',  'build'),
+        ('output is 1 when at least two inputs are 1','build'),
+        ('output is 1 when majority of inputs are 1', 'build'),
+        ('output is 1 when odd number of inputs are 1','build'),
+        ('output is 1 when even number of inputs are 1','build'),
+        ('output high when an odd number of inputs are high','build'),
+        ('output high when no inputs are high', 'build'),
+    ]
+    for n in INPUT_COUNTS:
+        for behaviour, _ in BEHAVIOURS:
+            out.append((f'make a circuit with {n} inputs where {behaviour}', 'build'))
+            out.append((f'build a {n}-input circuit where {behaviour}',      'build'))
+            out.append((f'design a circuit with {n} inputs, {behaviour}',    'build'))
+            out.append((f'{n} input circuit where {behaviour}',              'build'))
+            out.append((f'{n}-input circuit, {behaviour}',                   'build'))
+            out.append((f'i want a {n}-input gate where {behaviour}',        'build'))
+            out.append((f'give me a {n} input thing where {behaviour}',      'build'))
+            out.append((f'make an output from {n} inputs when {behaviour.replace("the output is", "output").replace("output is", "")}', 'build'))
+
+    # "make output", "give output", "produce output" — concise specifications
+    SHORT_VERBS = ['make a output', 'make an output', 'give me an output',
+                   'produce an output', 'i want an output', 'i need an output',
+                   'create an output', 'design an output']
+    SHORT_TAILS = [
+        'where inputs are all 1 then out is 0',
+        'when inputs are 1 then out is 0',
+        'when all inputs are 1 then output is 0',
+        'when any input is 1 then output is 1',
+        'when both inputs are 1 then output is 1',
+        'when all inputs are 0 then output is 1',
+        'when odd number of inputs are 1 then output is 1',
+        'when majority is 1 then output is 1',
+    ]
+    for sv in SHORT_VERBS:
+        for st in SHORT_TAILS:
+            out.append((f'{sv} {st}', 'build'))
+            out.append((f'{sv} from 3 input {st}', 'build'))
+            out.append((f'{sv} from 4 input {st}', 'build'))
+            out.append((f'{sv} from 5 input {st}', 'build'))
+            out.append((f'{sv} from 3-5 input {st}', 'build'))   # the exact user phrasing
+
+    # Counting-style: "circuit that outputs 1 when X of N inputs are 1"
+    for n in ['2', '3', '4', '5']:
+        for k in ['1', '2', '3']:
+            for cmp in ['exactly', 'at least', 'at most', 'more than', 'fewer than']:
+                out.append((f'circuit with {n} inputs where output is 1 when {cmp} {k} are high', 'build'))
+                out.append((f'build a {n}-input circuit, output high when {cmp} {k} of the inputs are 1', 'build'))
+
+    # Conditional specifications with explicit input letters
+    for nv in [(2, ['A','B']), (3, ['A','B','C']), (4, ['A','B','C','D'])]:
+        n, vs = nv
+        varlist = ' '.join(vs)
+        out.append((f'circuit with {n} inputs {varlist} where Y=1 when {vs[0]}={vs[-1]}', 'build'))
+        out.append((f'design a {n}-input circuit on inputs {varlist}', 'build'))
+        out.append((f'make a circuit on {varlist}, output is 1 when all are 1', 'build'))
+        out.append((f'circuit on inputs {varlist}, Y=1 only if {" and ".join(vs)}', 'build'))
+
     return out
 
 
@@ -230,6 +349,7 @@ def _what_if_samples():
 
 def _explain_samples():
     out = []
+    # ── About the current circuit
     bases = ['what does this circuit do', 'explain the circuit',
              'how does this work', 'describe this design',
              'tell me about this circuit', 'what is the purpose',
@@ -244,6 +364,55 @@ def _explain_samples():
     for q in bases:
         out.append((q, 'explain'))
         out.append((f'{q}?', 'explain'))
+
+    # ── About a CONCEPT or GATE TYPE (without a circuit context)
+    # These are the queries that previously misrouted to output_query.
+    CONCEPT_TOPICS = [
+        'and gate', 'or gate', 'not gate', 'nand gate', 'nor gate',
+        'xor gate', 'xnor gate', 'buffer', 'inverter',
+        'half adder', 'full adder', 'ripple carry adder', 'carry lookahead adder',
+        'mux', 'multiplexer', 'demultiplexer', 'decoder', 'encoder',
+        'priority encoder', 'comparator', 'parity generator',
+        'sr latch', 'd latch', 'd flip flop', 'jk flip flop', 't flip flop',
+        'master slave flip flop', 'shift register', 'ring counter',
+        'johnson counter', 'ripple counter', 'synchronous counter',
+        'finite state machine', 'mealy machine', 'moore machine',
+        'tri state buffer', 'tristate buffer',
+        'karnaugh map', 'k-map', 'truth table', 'boolean algebra',
+        'sum of products', 'product of sums', 'minterm', 'maxterm',
+        'propagation delay', 'setup time', 'hold time', 'metastability',
+        'race condition', 'static hazard', 'logic hazard',
+        'nand universality', 'nor universality',
+        'de morgans law', 'two complement', 'bcd', 'binary coded decimal',
+        'combinational circuit', 'sequential circuit',
+        'gray code', 'parity bit',
+    ]
+    EXPLAIN_PREFIXES = [
+        'what is', "what's", 'whats', 'what is a', 'what is an',
+        'explain', 'explain a', 'explain the', 'describe',
+        'tell me about', 'define', 'what does', 'how does',
+        'how do', 'can you explain', 'i want to learn about',
+        'teach me', 'help me understand', 'what is meant by',
+    ]
+    for topic in CONCEPT_TOPICS:
+        for pre in EXPLAIN_PREFIXES:
+            out.append((f'{pre} {topic}', 'explain'))
+            out.append((f'{pre} {topic}?', 'explain'))
+        # Bare topic — "xor gate" alone is also explain
+        out.append((topic, 'explain'))
+        out.append((f'{topic}?', 'explain'))
+        out.append((f'how does {topic} work', 'explain'))
+        out.append((f'how does an {topic} work', 'explain'))
+        out.append((f'how does {topic} work?', 'explain'))
+
+    # Concept questions with informal/casual wording
+    INFORMAL_PREFIXES = ['yo what is', 'hey explain', 'um what is',
+                         'so what is', 'just tell me what is',
+                         'wait what is', 'idk explain', 'plz explain']
+    for topic in CONCEPT_TOPICS[:25]:    # first half is enough
+        for pre in INFORMAL_PREFIXES:
+            out.append((f'{pre} {topic}', 'explain'))
+
     return out
 
 

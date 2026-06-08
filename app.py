@@ -26,7 +26,12 @@ Routes are split in two groups:
     POST /api/suggest/connection   -> ML-ranked next wire suggestions
 """
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, send_from_directory
+
+# Real-time multiplayer + auth + SQLite persistence
+from realtime import init_socketio
+from auth     import init_auth, bp as auth_bp, current_user
+import db
 from flask_cors import CORS
 import json, os, traceback
 from datetime import datetime
@@ -42,8 +47,29 @@ from ml_models.boolean_synth        import (
 )
 from ml_models.connection_suggester import ConnectionSuggester
 
+# Serve the Vite/React build from frontend/dist.
+_DIST = os.path.join(os.path.dirname(__file__), 'frontend', 'dist')
+
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True)
+
+# Production session cookie settings — required so login persists across
+# devices when served over HTTPS. In dev (FLASK_ENV != "production") we
+# relax these so http://localhost:5000 still works.
+_IS_PROD = os.environ.get("FLASK_ENV", "").lower() == "production"
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",      # Lax works for first-party OAuth redirects
+    SESSION_COOKIE_SECURE=_IS_PROD,     # Secure only under HTTPS
+    PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 30,   # 30 days
+)
+
+# OAuth (no-op when env vars are missing)
+init_auth(app)
+app.register_blueprint(auth_bp)
+
+# Real-time collaboration via WebSocket
+socketio = init_socketio(app)
 
 print("Loading ML models...")
 fault_detector       = FaultDetector()
@@ -61,12 +87,48 @@ print("All ML models ready.")
 CIRCUITS_DIR = 'circuits'
 os.makedirs(CIRCUITS_DIR, exist_ok=True)
 
+# Bring the SQLite schema up — no-op if already created.
+db.get_db()
+# Migrate any old filesystem-based saved circuits into the DB on first run.
+_migrated = db.migrate_filesystem_circuits(CIRCUITS_DIR)
+if _migrated:
+    print(f"[db] Migrated {_migrated} filesystem circuits into SQLite.")
+
 
 # -- helpers --------------------------------------------------------------------
 
 def _safe_name(name: str) -> str:
     return ''.join(c for c in (name or 'circuit')
                    if c.isalnum() or c in ' -_').strip() or 'circuit'
+
+
+def _session_id() -> str:
+    """
+    Returns the caller's session id. Resolution order:
+      1. The logged-in Google user's `id` (highest authority — survives across
+         devices and overrides any header the client might send).
+      2. The X-Session-Id header (used by guest / named users).
+      3.'default' (curl / CI / no-header requests).
+    Sanitized so it can be used as a folder name.
+    """
+    u = current_user()
+    if u and u.get('id'):
+        raw = u['id']
+    else:
+        raw = request.headers.get('X-Session-Id', 'default')
+    sid = ''.join(c for c in raw if c.isalnum() or c in '_-')[:64]
+    return sid or 'default'
+
+
+def _session_dir(sid: str = None) -> str:
+    """Per-session sub-folder under circuits/. Created on demand."""
+    sid = sid or _session_id()
+    # 'examples' is reserved for the shared examples gallery.
+    if sid == 'examples':
+        sid = 'default'
+    d = os.path.join(CIRCUITS_DIR, sid)
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 def _err(message, code=400, exc=None):
@@ -77,9 +139,22 @@ def _err(message, code=400, exc=None):
 
 # -- UI -------------------------------------------------------------------------
 
-@app.route('/', methods=['GET'])
-def index():
-    return render_template('index.html')
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def index(path=''):
+    """
+    Serve the React SPA from frontend/dist. API routes are registered first
+    so they take priority over this catch-all.
+    """
+    if not os.path.isdir(_DIST):
+        return jsonify({
+            'error': 'React frontend not built. Run `npm run build` in frontend/.'
+        }), 500
+    target = os.path.join(_DIST, path)
+    if path and os.path.isfile(target):
+        return send_from_directory(_DIST, path)
+    # SPA fallback: always serve index.html so React Router works.
+    return send_from_directory(_DIST, 'index.html')
 
 
 # -- Simulation (frontend-facing) -----------------------------------------------
@@ -112,16 +187,11 @@ def simulate():
 @app.route('/save', methods=['POST'])
 def save_short():
     try:
-        data = request.get_json(silent=True) or {}
-        name = _safe_name(data.get('name', 'circuit'))
-        payload = {
-            'name':      name,
-            'gates':     data.get('gates', []),
-            'wires':     data.get('wires', []),
-            'timestamp': datetime.now().isoformat(),
-        }
-        with open(os.path.join(CIRCUITS_DIR, f"{name}.json"), 'w') as f:
-            json.dump(payload, f, indent=2)
+        data  = request.get_json(silent=True) or {}
+        name  = _safe_name(data.get('name', 'circuit'))
+        gates = data.get('gates', [])
+        wires = data.get('wires', [])
+        db.save_circuit(_session_id(), name, gates, wires)
         return jsonify({'success': True, 'message': f'Saved: {name}'})
     except Exception as e:
         return _err(e, exc=e)
@@ -131,16 +201,20 @@ def save_short():
 def load_short(name):
     try:
         name = _safe_name(name)
-        path = os.path.join(CIRCUITS_DIR, f"{name}.json")
-        if not os.path.exists(path):
+        # First try the caller's own circuits, then the shared examples folder.
+        circuit = db.load_circuit(_session_id(), name)
+        if circuit is None:
+            ex_path = os.path.join(CIRCUITS_DIR, 'examples', f"{name}.json")
+            if os.path.exists(ex_path):
+                with open(ex_path) as f:
+                    ex_data = json.load(f)
+                circuit = {'gates': ex_data.get('gates', []),
+                           'wires': ex_data.get('wires', [])}
+        if circuit is None:
             return jsonify({'success': False, 'error': f'Not found: {name}'}), 404
-        with open(path) as f:
-            data = json.load(f)
-        circuit = {
-            'gates': data.get('gates', data.get('circuit', {}).get('gates', [])),
-            'wires': data.get('wires', data.get('circuit', {}).get('wires', [])),
-        }
-        return jsonify({'success': True, 'circuit': circuit, 'name': name})
+        return jsonify({'success': True, 'circuit': {
+            'gates': circuit['gates'], 'wires': circuit['wires'],
+        }, 'name': name})
     except Exception as e:
         return _err(e, exc=e)
 
@@ -148,10 +222,41 @@ def load_short(name):
 @app.route('/list-circuits', methods=['GET'])
 def list_short():
     try:
-        names = [f[:-5] for f in os.listdir(CIRCUITS_DIR)
-                 if f.endswith('.json')]
-        names.sort()
-        return jsonify({'success': True, 'circuits': names})
+        my_names = db.list_circuits(_session_id())
+        ex_dir   = os.path.join(CIRCUITS_DIR, 'examples')
+        examples = sorted([f[:-5] for f in os.listdir(ex_dir) if f.endswith('.json')]) \
+                   if os.path.isdir(ex_dir) else []
+        return jsonify({
+            'success':  True,
+            'circuits': my_names,         # back-compat
+            'mine':     my_names,
+            'examples': examples,
+        })
+    except Exception as e:
+        return _err(e, exc=e)
+
+
+# ─── Room creation / lookup ─────────────────────────────────────────────────
+
+@app.route('/api/rooms/new', methods=['POST'])
+def room_new():
+    """Auto-generate a 6-character room code that's easy to share."""
+    try:
+        code = db.generate_room_code()
+        return jsonify({'success': True, 'code': code,
+                        'url': f'/?room={code}'})
+    except Exception as e:
+        return _err(e, exc=e)
+
+
+@app.route('/api/rooms/<code>', methods=['GET'])
+def room_info(code):
+    try:
+        code = ''.join(c for c in code.upper() if c.isalnum())[:12]
+        info = db.get_room(code)
+        if not info:
+            return jsonify({'exists': False, 'code': code})
+        return jsonify({'exists': True, **info})
     except Exception as e:
         return _err(e, exc=e)
 
@@ -211,8 +316,21 @@ def analyze_minimize():
         circuit    = data.get('circuit', {})
         constraint = data.get('constraint')
         suggestions = gate_minimizer.suggest_implementation(circuit, constraint)
-        return jsonify({'status': 'success', 'suggestions': suggestions,
-                        'timestamp': datetime.now().isoformat()})
+        # Pull gate-count / efficiency / benchmark from the full minimizer so
+        # SmartPanel.MinTab can render them. Falls back gracefully if the
+        # model can't score this particular circuit.
+        try:
+            stats = gate_minimizer.minimize_circuit(circuit) or {}
+        except Exception:
+            stats = {}
+        return jsonify({
+            'status':             'success',
+            'suggestions':        suggestions,
+            'current_gate_count': stats.get('current_gate_count'),
+            'efficiency_score':   stats.get('efficiency_score'),
+            'benchmark':          stats.get('benchmark'),
+            'timestamp':          datetime.now().isoformat(),
+        })
     except Exception as e:
         return _err(e, exc=e)
 
@@ -228,8 +346,161 @@ def ask_question():
         if not question:
             return _err('No question provided', 400)
         result = question_solver.solve(question, circuit)
+        # Log the question + classified intent for online-learning feedback.
+        # Each row gets a unique id so the client can attach feedback later.
+        qid = _log_query(question, result)
+        result['query_id'] = qid
         return jsonify({'status': 'success', **result,
                         'timestamp': datetime.now().isoformat()})
+    except Exception as e:
+        return _err(e, exc=e)
+
+
+# ── User-feedback online-learning loop ────────────────────────────────────────
+# Every /api/ask call appends one row to data/user_queries.csv. The /api/feedback
+# endpoint flips a row's `helpful` flag and optionally corrects the intent
+# label. The retrain script (data/retrain_intent.py) merges this file with the
+# programmatic dataset before training.
+
+_QUERY_LOG = os.path.join('data', 'user_queries.csv')
+_QUERY_LOG_FIELDS = ['id', 'session_id', 'timestamp', 'question', 'intent',
+                     'intent_confidence', 'ml_source',
+                     'helpful', 'corrected_intent']
+
+
+def _migrate_query_log_if_needed():
+    """One-time migration: add session_id column to existing user_queries.csv."""
+    import csv
+    if not os.path.exists(_QUERY_LOG):
+        return
+    with open(_QUERY_LOG, 'r', newline='', encoding='utf-8') as f:
+        first = f.readline().strip()
+    if 'session_id' in first:
+        return   # already migrated
+    rows = []
+    with open(_QUERY_LOG, 'r', newline='', encoding='utf-8') as f:
+        for r in csv.DictReader(f):
+            r['session_id'] = 'legacy'
+            rows.append(r)
+    with open(_QUERY_LOG, 'w', newline='', encoding='utf-8') as f:
+        w = csv.DictWriter(f, fieldnames=_QUERY_LOG_FIELDS)
+        w.writeheader()
+        w.writerows(rows)
+
+
+def _log_query(question: str, result: dict) -> str:
+    """Append the asked question + classified intent to the user-query log."""
+    import csv
+    import uuid
+    _migrate_query_log_if_needed()
+    qid = uuid.uuid4().hex[:12]
+    row = {
+        'id':                qid,
+        'session_id':        _session_id(),
+        'timestamp':         datetime.now().isoformat(),
+        'question':          question.strip()[:300],
+        'intent':            result.get('intent', ''),
+        'intent_confidence': result.get('intent_confidence', ''),
+        'ml_source':         result.get('ml_source', ''),
+        'helpful':           '',
+        'corrected_intent':  '',
+    }
+    new_file = not os.path.exists(_QUERY_LOG)
+    try:
+        with open(_QUERY_LOG, 'a', newline='', encoding='utf-8') as f:
+            w = csv.DictWriter(f, fieldnames=_QUERY_LOG_FIELDS)
+            if new_file: w.writeheader()
+            w.writerow(row)
+    except Exception:
+        pass
+    return qid
+
+
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    """
+    Body: {query_id: str, helpful: bool, corrected_intent?: str}
+    Updates the user-query log so the retraining pipeline can use it.
+    """
+    import csv
+    try:
+        data = request.get_json(silent=True) or {}
+        qid     = data.get('query_id', '').strip()
+        helpful = data.get('helpful')
+        corrected = (data.get('corrected_intent') or '').strip()
+        if not qid:
+            return _err('Missing query_id', 400)
+        if not os.path.exists(_QUERY_LOG):
+            return _err('No query log yet', 404)
+
+        # Rewrite the CSV with the matching row updated.
+        rows = []
+        updated = False
+        with open(_QUERY_LOG, 'r', newline='', encoding='utf-8') as f:
+            for r in csv.DictReader(f):
+                if r.get('id') == qid:
+                    if helpful is not None: r['helpful'] = '1' if helpful else '0'
+                    if corrected:           r['corrected_intent'] = corrected
+                    updated = True
+                rows.append(r)
+        with open(_QUERY_LOG, 'w', newline='', encoding='utf-8') as f:
+            w = csv.DictWriter(f, fieldnames=_QUERY_LOG_FIELDS)
+            w.writeheader()
+            w.writerows(rows)
+
+        return jsonify({'status': 'success', 'updated': updated, 'query_id': qid})
+    except Exception as e:
+        return _err(e, exc=e)
+
+
+@app.route('/api/learning/stats', methods=['GET'])
+def learning_stats():
+    """Show how much user data the ML can learn from."""
+    import csv
+    if not os.path.exists(_QUERY_LOG):
+        return jsonify({'total_queries': 0, 'helpful': 0, 'unhelpful': 0,
+                        'corrected': 0, 'intents': {}})
+    helpful = unhelpful = corrected = total = 0
+    intents = {}
+    with open(_QUERY_LOG, 'r', newline='', encoding='utf-8') as f:
+        for r in csv.DictReader(f):
+            total += 1
+            if r.get('helpful') == '1':   helpful   += 1
+            if r.get('helpful') == '0':   unhelpful += 1
+            if r.get('corrected_intent'): corrected += 1
+            i = r.get('intent', '')
+            intents[i] = intents.get(i, 0) + 1
+    return jsonify({
+        'total_queries':   total,
+        'helpful':         helpful,
+        'unhelpful':       unhelpful,
+        'corrected':       corrected,
+        'intents':         intents,
+    })
+
+
+@app.route('/api/learning/retrain', methods=['POST'])
+def trigger_retrain():
+    """
+    Merges user-query log into intent training data and retrains the
+    classifier. Use sparingly — full retrain takes 10-30 seconds.
+    """
+    from ml_models.question_solver import QuestionSolver
+    try:
+        # Wipe the pickle so the IntentClassifier lazily retrains on next /ask.
+        pkl = os.path.join('ml_models', 'saved', 'intent_classifier.pkl')
+        if os.path.exists(pkl):
+            os.remove(pkl)
+        # Reset the class-level cache (NOT instance) so the next call rebuilds.
+        QuestionSolver._ml_intent = None
+        # Pre-train synchronously so the user sees the update happen now.
+        from ml_models.intent_classifier import IntentClassifier
+        fresh = IntentClassifier()           # this triggers train() via _load_or_train
+        QuestionSolver._ml_intent = fresh
+        return jsonify({
+            'status': 'success',
+            'message': 'Intent classifier retrained with your feedback merged in.',
+        })
     except Exception as e:
         return _err(e, exc=e)
 
@@ -462,9 +733,14 @@ def delete_circuit(name):
 
 
 if __name__ == '__main__':
-    # Local dev defaults; PaaS hosts (Render, Railway, Fly, Heroku, etc.) set
-    # $PORT and we honour it. Set FLASK_DEBUG=0 in production to disable the
-    # debug auto-reloader.
+    # Local dev defaults; PaaS hosts set $PORT and we honour it.
+    # MUST use socketio.run instead of app.run so WebSocket connections work.
     port  = int(os.environ.get('PORT', '5000'))
     debug = os.environ.get('FLASK_DEBUG', '1') == '1'
-    app.run(debug=debug, port=port, host='0.0.0.0')
+    socketio.run(
+        app,
+        host='0.0.0.0', port=port,
+        debug=debug,
+        # Werkzeug refuses to run in prod by default; allow it for dev.
+        allow_unsafe_werkzeug=True,
+    )

@@ -1,0 +1,716 @@
+{
+  "name": "bcd_7seg",
+  "gates": [
+    {
+      "id": "g1",
+      "label": "A",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 80
+    },
+    {
+      "id": "g2",
+      "label": "C",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 170
+    },
+    {
+      "id": "g3",
+      "output": null,
+      "type": "OR",
+      "x": 240,
+      "y": 80
+    },
+    {
+      "id": "g4",
+      "label": "B",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 260
+    },
+    {
+      "id": "g5",
+      "label": "D",
+      "output": null,
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 350
+    },
+    {
+      "id": "g6",
+      "output": null,
+      "type": "AND",
+      "x": 240,
+      "y": 170
+    },
+    {
+      "id": "g7",
+      "output": null,
+      "type": "OR",
+      "x": 400,
+      "y": 80
+    },
+    {
+      "id": "g8",
+      "output": null,
+      "type": "NOT",
+      "x": 240,
+      "y": 260
+    },
+    {
+      "id": "g9",
+      "output": null,
+      "type": "NOT",
+      "x": 240,
+      "y": 350
+    },
+    {
+      "id": "g10",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 170
+    },
+    {
+      "id": "g11",
+      "output": null,
+      "type": "OR",
+      "x": 560,
+      "y": 80
+    },
+    {
+      "id": "g12",
+      "label": "a",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 720,
+      "y": 80
+    },
+    {
+      "id": "g13",
+      "output": null,
+      "type": "NOT",
+      "x": 240,
+      "y": 440
+    },
+    {
+      "id": "g14",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 260
+    },
+    {
+      "id": "g15",
+      "output": null,
+      "type": "OR",
+      "x": 560,
+      "y": 170
+    },
+    {
+      "id": "g16",
+      "output": null,
+      "type": "AND",
+      "x": 240,
+      "y": 530
+    },
+    {
+      "id": "g17",
+      "output": null,
+      "type": "OR",
+      "x": 720,
+      "y": 170
+    },
+    {
+      "id": "g18",
+      "label": "b",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 880,
+      "y": 80
+    },
+    {
+      "id": "g19",
+      "output": null,
+      "type": "OR",
+      "x": 400,
+      "y": 350
+    },
+    {
+      "id": "g20",
+      "output": null,
+      "type": "OR",
+      "x": 560,
+      "y": 260
+    },
+    {
+      "id": "g21",
+      "label": "c",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 720,
+      "y": 260
+    },
+    {
+      "id": "g22",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 440
+    },
+    {
+      "id": "g23",
+      "output": null,
+      "type": "OR",
+      "x": 560,
+      "y": 350
+    },
+    {
+      "id": "g24",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 530
+    },
+    {
+      "id": "g25",
+      "output": null,
+      "type": "OR",
+      "x": 720,
+      "y": 350
+    },
+    {
+      "id": "g26",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 620
+    },
+    {
+      "id": "g27",
+      "output": null,
+      "type": "AND",
+      "x": 560,
+      "y": 440
+    },
+    {
+      "id": "g28",
+      "output": null,
+      "type": "OR",
+      "x": 880,
+      "y": 170
+    },
+    {
+      "id": "g29",
+      "output": null,
+      "type": "OR",
+      "x": 1040,
+      "y": 80
+    },
+    {
+      "id": "g30",
+      "label": "d",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 1200,
+      "y": 80
+    },
+    {
+      "id": "g31",
+      "label": "e",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 720,
+      "y": 440
+    },
+    {
+      "id": "g32",
+      "output": null,
+      "type": "OR",
+      "x": 560,
+      "y": 530
+    },
+    {
+      "id": "g33",
+      "output": null,
+      "type": "AND",
+      "x": 400,
+      "y": 710
+    },
+    {
+      "id": "g34",
+      "output": null,
+      "type": "OR",
+      "x": 720,
+      "y": 530
+    },
+    {
+      "id": "g35",
+      "output": null,
+      "type": "OR",
+      "x": 880,
+      "y": 260
+    },
+    {
+      "id": "g36",
+      "label": "f",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 1040,
+      "y": 170
+    },
+    {
+      "id": "g37",
+      "output": null,
+      "type": "OR",
+      "x": 720,
+      "y": 620
+    },
+    {
+      "id": "g38",
+      "output": null,
+      "type": "OR",
+      "x": 880,
+      "y": 350
+    },
+    {
+      "id": "g39",
+      "label": "g",
+      "output": null,
+      "type": "OUTPUT",
+      "x": 1040,
+      "y": 260
+    }
+  ],
+  "wires": [
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w1",
+      "to_gate": "g3",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w2",
+      "to_gate": "g3",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w3",
+      "to_gate": "g6",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g5",
+      "from_pin": 0,
+      "id": "w4",
+      "to_gate": "g6",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g3",
+      "from_pin": 0,
+      "id": "w5",
+      "to_gate": "g7",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g6",
+      "from_pin": 0,
+      "id": "w6",
+      "to_gate": "g7",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w7",
+      "to_gate": "g8",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g5",
+      "from_pin": 0,
+      "id": "w8",
+      "to_gate": "g9",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g8",
+      "from_pin": 0,
+      "id": "w9",
+      "to_gate": "g10",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g9",
+      "from_pin": 0,
+      "id": "w10",
+      "to_gate": "g10",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g7",
+      "from_pin": 0,
+      "id": "w11",
+      "to_gate": "g11",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g10",
+      "from_pin": 0,
+      "id": "w12",
+      "to_gate": "g11",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g11",
+      "from_pin": 0,
+      "id": "w13",
+      "to_gate": "g12",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w14",
+      "to_gate": "g13",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g13",
+      "from_pin": 0,
+      "id": "w15",
+      "to_gate": "g14",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g9",
+      "from_pin": 0,
+      "id": "w16",
+      "to_gate": "g14",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g8",
+      "from_pin": 0,
+      "id": "w17",
+      "to_gate": "g15",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g14",
+      "from_pin": 0,
+      "id": "w18",
+      "to_gate": "g15",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w19",
+      "to_gate": "g16",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g5",
+      "from_pin": 0,
+      "id": "w20",
+      "to_gate": "g16",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g15",
+      "from_pin": 0,
+      "id": "w21",
+      "to_gate": "g17",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g16",
+      "from_pin": 0,
+      "id": "w22",
+      "to_gate": "g17",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g17",
+      "from_pin": 0,
+      "id": "w23",
+      "to_gate": "g18",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w24",
+      "to_gate": "g19",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g13",
+      "from_pin": 0,
+      "id": "w25",
+      "to_gate": "g19",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g19",
+      "from_pin": 0,
+      "id": "w26",
+      "to_gate": "g20",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g5",
+      "from_pin": 0,
+      "id": "w27",
+      "to_gate": "g20",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g20",
+      "from_pin": 0,
+      "id": "w28",
+      "to_gate": "g21",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w29",
+      "to_gate": "g22",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g9",
+      "from_pin": 0,
+      "id": "w30",
+      "to_gate": "g22",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g10",
+      "from_pin": 0,
+      "id": "w31",
+      "to_gate": "g23",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g22",
+      "from_pin": 0,
+      "id": "w32",
+      "to_gate": "g23",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g8",
+      "from_pin": 0,
+      "id": "w33",
+      "to_gate": "g24",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w34",
+      "to_gate": "g24",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g23",
+      "from_pin": 0,
+      "id": "w35",
+      "to_gate": "g25",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g24",
+      "from_pin": 0,
+      "id": "w36",
+      "to_gate": "g25",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w37",
+      "to_gate": "g26",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g13",
+      "from_pin": 0,
+      "id": "w38",
+      "to_gate": "g26",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g26",
+      "from_pin": 0,
+      "id": "w39",
+      "to_gate": "g27",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g5",
+      "from_pin": 0,
+      "id": "w40",
+      "to_gate": "g27",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g25",
+      "from_pin": 0,
+      "id": "w41",
+      "to_gate": "g28",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g27",
+      "from_pin": 0,
+      "id": "w42",
+      "to_gate": "g28",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g28",
+      "from_pin": 0,
+      "id": "w43",
+      "to_gate": "g29",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w44",
+      "to_gate": "g29",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g29",
+      "from_pin": 0,
+      "id": "w45",
+      "to_gate": "g30",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g23",
+      "from_pin": 0,
+      "id": "w46",
+      "to_gate": "g31",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w47",
+      "to_gate": "g32",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g26",
+      "from_pin": 0,
+      "id": "w48",
+      "to_gate": "g32",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w49",
+      "to_gate": "g33",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g9",
+      "from_pin": 0,
+      "id": "w50",
+      "to_gate": "g33",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g32",
+      "from_pin": 0,
+      "id": "w51",
+      "to_gate": "g34",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g33",
+      "from_pin": 0,
+      "id": "w52",
+      "to_gate": "g34",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g34",
+      "from_pin": 0,
+      "id": "w53",
+      "to_gate": "g35",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g14",
+      "from_pin": 0,
+      "id": "w54",
+      "to_gate": "g35",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g35",
+      "from_pin": 0,
+      "id": "w55",
+      "to_gate": "g36",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g32",
+      "from_pin": 0,
+      "id": "w56",
+      "to_gate": "g37",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g24",
+      "from_pin": 0,
+      "id": "w57",
+      "to_gate": "g37",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g37",
+      "from_pin": 0,
+      "id": "w58",
+      "to_gate": "g38",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g22",
+      "from_pin": 0,
+      "id": "w59",
+      "to_gate": "g38",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g38",
+      "from_pin": 0,
+      "id": "w60",
+      "to_gate": "g39",
+      "to_pin": 0
+    }
+  ],
+  "description": "Synthesized from: \"bcd to 7 segment decoder\""
+}

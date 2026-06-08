@@ -1,0 +1,34 @@
+# One-click deploy on Render.com
+#
+# 1. Push this repo to GitHub
+# 2. Sign in to https://render.com with GitHub
+# 3. New → Blueprint → connect this repo
+# 4. Render reads render.yaml and provisions everything
+# 5. Your site is live at https://<service-name>.onrender.com
+#
+# The free tier spins down after 15 minutes of inactivity (cold start ~30s on
+# next request). For always-on, upgrade to Starter ($7/mo) — no code changes
+# needed.
+
+services:
+  - type: web
+    name: logicgate
+    env: docker
+    plan: free                      # change to "starter" for always-on
+    healthCheckPath: /api/health
+    disk:
+      name: logicgate-data
+      mountPath: /app/data          # SQLite DB + user query log
+      sizeGB: 1
+    envVars:
+      - key: PORT
+        value: 10000                # Render injects this; matches our Dockerfile
+      - key: FLASK_SECRET_KEY
+        generateValue: true         # Random secret per deploy
+      - key: FLASK_ENV
+        value: production
+      # Optional: set these if you want "Sign in with Google" enabled.
+      # - key: GOOGLE_CLIENT_ID
+      #   sync: false
+      # - key: GOOGLE_CLIENT_SECRET
+      #   sync: false

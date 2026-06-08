@@ -335,6 +335,108 @@ MULTI_OUTPUT_CIRCUITS = {
         ('Cout',
          'S1 & ~S0 & ((A & B) | (Cin & (A ^ B)))'),
     ],
+
+    # === 2's complement (4-bit) ==========================================
+    # 2's complement = 1's complement + 1  (carry-chain adder)
+    # Bit-level: Y0=~D, Y1=~C^~D, Y2=~B^~(C|D), Y3=~A^~(B|C|D)
+    "2's complement": [
+        ('Y0', '~D'),
+        ('Y1', '~C ^ ~D'),
+        ('Y2', '~B ^ (~C & ~D)'),
+        ('Y3', '~A ^ (~B & ~C & ~D)'),
+    ],
+    'twos complement': [
+        ('Y0', '~D'),
+        ('Y1', '~C ^ ~D'),
+        ('Y2', '~B ^ (~C & ~D)'),
+        ('Y3', '~A ^ (~B & ~C & ~D)'),
+    ],
+
+    # === 4-bit equality comparator =======================================
+    '4 bit equality comparator': [
+        ('Equal',
+         '(~(A3 ^ B3)) & (~(A2 ^ B2)) & (~(A1 ^ B1)) & (~(A0 ^ B0))')
+    ],
+    'equality comparator': [
+        ('Equal',
+         '(~(A3 ^ B3)) & (~(A2 ^ B2)) & (~(A1 ^ B1)) & (~(A0 ^ B0))')
+    ],
+
+    # === Booth recoder (1-bit: P = X & ~Y, M = ~X & Y) ==================
+    'sign detector': [
+        ('Positive', '~S'),
+        ('Negative', 'S'),
+    ],
+
+    # === 2-to-1 multiplexer (explicit naming) ============================
+    '2 to 1 multiplexer': [('Y', '(SEL & D1) | (~SEL & D0)')],
+
+    # === Carry lookahead (1-bit) ==========================================
+    # Generate G=A&B, Propagate P=A^B, Carry-out Cout = G | (P & Cin)
+    'carry lookahead': [
+        ('G',    'A & B'),
+        ('P',    'A ^ B'),
+        ('Cout', '(A & B) | ((A ^ B) & Cin)'),
+        ('Sum',  'A ^ B ^ Cin'),
+    ],
+    'carry lookahead adder': [
+        ('G',    'A & B'),
+        ('P',    'A ^ B'),
+        ('Cout', '(A & B) | ((A ^ B) & Cin)'),
+        ('Sum',  'A ^ B ^ Cin'),
+    ],
+
+    # === Tri-state buffer (active-high enable) ============================
+    'tri state buffer': [('Y', 'EN & A')],
+    'tristate buffer':  [('Y', 'EN & A')],
+
+    # === 4-bit shift register (parallel-in serial-out combinational) =====
+    # This is the combinational output for each bit after one shift
+    '4 bit shift register': [
+        ('Q0', 'D3'),
+        ('Q1', 'D0'),
+        ('Q2', 'D1'),
+        ('Q3', 'D2'),
+    ],
+
+    # === Barrel shifter (2-bit data, 1-bit shift control) ================
+    'barrel shifter': [
+        ('Y0', '(~S & D0) | (S & D1)'),
+        ('Y1', '(~S & D1) | (S & D0)'),
+    ],
+
+    # === Wallace tree multiplier (2x2 bit) ================================
+    '2 bit multiplier': [
+        ('P0', 'A0 & B0'),
+        ('P1', '(A1 & B0) ^ (A0 & B1)'),
+        ('P2', '(A1 & B1) ^ ((A1 & B0) & (A0 & B1))'),
+        ('P3', '(A1 & B1) & ((A1 & B0) | (A0 & B1))'),
+    ],
+
+    # === Schmitt trigger (hysteresis model — digital approximation) =======
+    # Cannot be accurately represented in static boolean; emit OR approximation
+    'schmitt trigger': [('Y', 'A | B')],
+
+    # === Common SR latch aliases ==========================================
+    'sr latch using nor':  [('Q',     '~(R | Q_bar)'), ('Q_bar', '~(S | Q)')],
+
+    # === Clocked D latch (combinational equations for output) =============
+    'clocked d latch': [
+        ('Q',     'E & D | ~E & Q'),
+        ('Q_bar', '~(E & D | ~E & Q)'),
+    ],
+
+    # === 4-bit ripple counter (mod-16) — combinational transition ==========
+    # Each bit toggles when all lower bits are 1
+    '4 bit counter': [
+        ('Q0', '~Q0'),
+        ('Q1', 'Q0 ^ Q1'),
+        ('Q2', '(Q0 & Q1) ^ Q2'),
+        ('Q3', '(Q0 & Q1 & Q2) ^ Q3'),
+    ],
+
+    # === Multiplexer-based function generator =============================
+    '2 to 1 mux function': [('Y', '(S & F1) | (~S & F0)')],
 }
 
 
@@ -355,6 +457,28 @@ _ALIAS_RULES = [
     (r'\baddder\b',           'adder'),
     (r'\baddr\b',             'adder'),
     (r'\baddee?r\b',          'adder'),
+    (r'\badwer\b',            'adder'),
+    (r'\badedr\b',            'adder'),
+    (r'\baddar\b',             'adder'),
+    (r'\bfll\b',              'full'),
+    (r'\bfulll\b',            'full'),
+    (r'\bfullll\b',           'full'),
+    (r'\bful\b',              'full'),
+    (r'\bbiuld\b',            'build'),
+    (r'\bbuld\b',             'build'),
+    (r'\bbiuid\b',            'build'),
+    (r'\bbuiild\b',           'build'),
+    (r'\bmultipxer\b',        'multiplexer'),
+    (r'\bmultipler\b',        'multiplexer'),
+    (r'\bmlutiplexer\b',      'multiplexer'),
+    (r'\bdecodr\b',           'decoder'),
+    (r'\bencodr\b',           'encoder'),
+    (r'\bwithh\b',            'with'),
+    (r'\busng\b',             'using'),
+    (r'\bonly\s+nadn\b',      'only nand'),
+    (r'\bnadn\b',             'nand'),
+    (r'\bnro\b',              'nor'),
+    (r'\bxnro\b',             'xnor'),
     (r'\bhalfadder\b',        'half adder'),
     (r'\bfulladder\b',        'full adder'),
     (r'\bhalfsubtractor\b',   'half subtractor'),
@@ -362,6 +486,17 @@ _ALIAS_RULES = [
     (r'\bsubtracter\b',       'subtractor'),
     (r'\bsubstractor\b',      'subtractor'),
     (r'\bsubstracter\b',      'subtractor'),
+    # Mux synonyms: "1-of-N selector" / "N-input selector" / "N:1 selector" → "N to 1 mux"
+    (r'\b1[-\s]?of[-\s]?(\d+)\s+selector\b',  r'\1 to 1 mux'),
+    (r'\b(\d+)[-:\s]?(?:input|to)?[-:\s]?1\s+selector\b', r'\1 to 1 mux'),
+    (r'\bdata\s+selector\b',              'multiplexer'),
+    # Threshold patterns: "K of N inputs are 1" → "at least K of N inputs are 1"
+    # (bare "K of N" is ambiguous; default to "at least" for usability)
+    (r'\b(\d+)\s+of\s+(\d+)\s+inputs?\s+(?:are|is)\s+(?:1|high|on)\b',
+     r'at least \1 of \2 inputs are 1'),
+    # "outputs 1 when N of M ..." normalizer
+    (r'\boutputs?\s+1\s+when\s+(\d+)\s+of\s+(\d+)\b',
+     r'output is 1 when at least \1 of \2'),
     # Bare "subtractor" / "adder"  -  assume the full (3-input) variant.
     (r'^(?:please\s+)?(?:build|make|design|create|generate|give\s+me|i\s+(?:want|need))?\s*(?:a|an|the)?\s*subtractor\b',
      'full subtractor'),
@@ -421,6 +556,32 @@ _ALIAS_RULES = [
     (r"\bbitwise\s+(?:not|inverter|invert)\b", "1's complement"),
     # Priority encoder with valid
     (r'\bpriority\s+encoder\s+with\s+valid\b', 'priority encoder valid'),
+    # 2's complement
+    (r"\b(?:two'?s?|2'?s?)\s+complement\b", "2's complement"),
+    (r"\b2's\s+comp\b",                     "2's complement"),
+    # Carry lookahead
+    (r'\bcarry[-\s]+lookahead\b',           'carry lookahead'),
+    (r'\bcla\s+adder\b',                    'carry lookahead adder'),
+    (r'\bcla\b',                            'carry lookahead'),
+    # Barrel shifter
+    (r'\bbarrel[-\s]+shift(?:er)?\b',       'barrel shifter'),
+    # Tri-state
+    (r'\btri[-\s]+state\b',                 'tri state buffer'),
+    (r'\b3[-\s]+state\b',                   'tri state buffer'),
+    # Counter
+    (r'\b4[-\s]+bit\s+(?:ripple\s+)?counter\b', '4 bit counter'),
+    (r'\bmod[-\s]*16\s+counter\b',          '4 bit counter'),
+    # 2-bit multiplier
+    (r'\b2[-\s]+bit\s+multiplier\b',        '2 bit multiplier'),
+    (r'\b2x2\s+multiplier\b',               '2 bit multiplier'),
+    # Equality
+    (r'\b(?:equality|equal)\s+comparator\b', 'equality comparator'),
+    (r'\b4[-\s]+bit\s+equality\b',           '4 bit equality comparator'),
+    # Mux aliases
+    (r'\b2\s*to\s*1\s+multiplexer\b',       '2 to 1 multiplexer'),
+    (r'\b2x1\s+mux\b',                      '2 to 1 mux'),
+    (r'\b4x1\s+mux\b',                      '4 to 1 mux'),
+    (r'\b8x1\s+mux\b',                      '8 to 1 mux'),
 ]
 
 
@@ -431,8 +592,103 @@ def _normalize_request_text(text: str) -> str:
     the surrounding text.
     """
     out = text
+
+    # Strip pure-conversational openers that defeat the matchers.
+    # "can't this be done with NOR only" -> "full adder with NOR only" if a
+    # circuit name follows; otherwise drop the whole rhetorical opener so the
+    # restriction phrase ("with NOR only") still parses cleanly.
+    out = re.sub(
+        r"^\s*(can(?:'?t|not)|won'?t|don'?t|cannot|will\s+not|"
+        r"is\s+it|isn'?t\s+it)\s+"
+        r"(?:you|u|this|that|we|i|it)?\s*"
+        r"(?:please\s+)?"
+        # Verb chain: handles both single verbs ("build") and passive
+        # constructions ("be done", "be built"). Consumes up to two verbs.
+        r"(?:be\s+)?"
+        r"(?:made|make|done|do|built|build|created|create|"
+        r"designed|design|get|gotten)?\s*",
+        '',
+        out, flags=re.IGNORECASE,
+    )
+    # Re-insert "with" if we just stripped it but a gate-set restriction
+    # token follows (so "this be done with NOR only" -> "NOR only" still
+    # gets picked up by the suffix-only restriction matcher).
+    # Generic polite/question openers that add no semantic content.
+    out = re.sub(
+        r"^\s*(?:please|pls|plz|kindly|hey|hi|hello|"
+        r"can\s+(?:you|u)|could\s+(?:you|u)|would\s+(?:you|u)|"
+        r"will\s+(?:you|u)|how\s+(?:do|to)\s+i|how\s+can\s+i|"
+        r"what\s+is|what\'s|i\s+want\s+(?:to\s+)?(?:see\s+)?|"
+        r"i\s+(?:would\s+like|need|wanna|wish)|i'd\s+like|"
+        r"gimme|give\s+me|show\s+me|tell\s+me|teach\s+me|"
+        r"help\s+me)\s+",
+        '',
+        out, flags=re.IGNORECASE,
+    )
+
+    # Build verbs that ALSO need to be stripped so the boolean parser sees
+    # the bare expression: "make A AND NOT B" → "A AND NOT B".
+    # Step 1 (case-insensitive): strip the leading verb itself.
+    for _ in range(3):
+        new = re.sub(
+            r"^\s*(?:build|make|design|create|construct|generate|draw|"
+            r"wire\s+up|synthesize|synthesise|implement|assemble|sketch|"
+            r"put\s+together|render|produce|set\s+up|"
+            r"i\s+(?:want|need|wanna|wish)|let\'?s)\s+"
+            r"(?:to\s+(?:build|make|design|create|construct|"
+            r"generate|draw|implement|do|get)\s+)?",
+            '',
+            out, flags=re.IGNORECASE,
+        )
+        if new == out: break
+        out = new
+
+    # Step 2 (case-SENSITIVE): strip lowercase articles/fillers ONLY. This
+    # protects single-letter variables like "A" / "B" that share spelling
+    # with the article "a". A user typing "design A xor B" keeps A intact.
+    out = re.sub(
+        r"^\s*(?:me|us|a|an|the|some|this|that)\s+",
+        '', out)
+    # Repeat once for "build me a circuit" → "circuit"
+    out = re.sub(
+        r"^\s*(?:me|us|a|an|the|some|this|that)\s+",
+        '', out)
+
+    # Strip a leading "Y = " / "Z = " / "output = " preamble that some users
+    # type before the actual expression — keeps the boolean parser happy.
+    out = re.sub(r"^\s*(?:[yYzZ]\s*=\s*|output\s*=\s*)", "", out)
+    # Trim trailing "circuit/gate/thing/function" filler word that doesn't
+    # carry semantic content for the synthesizer.
+    out = re.sub(r"^\s*(?:circuit\s+for|circuit\s+where\s+)", "", out, flags=re.IGNORECASE)
+
     for pattern, repl in _ALIAS_RULES:
         out = re.sub(pattern, repl, out, flags=re.IGNORECASE)
+
+    # ── Range collapse: "3-5 input" / "3 to 5 inputs" / "3 or 4 input" ──────
+    # The parser only handles a single input count, so a range like "3-5 input"
+    # gets collapsed to the upper bound — that's what users typically mean
+    # ("make a circuit with somewhere around 3-5 inputs" → use 5).
+    def _collapse_range(m):
+        hi = m.group('hi')
+        unit = m.group('unit')
+        return f"{hi} {unit}"
+    out = re.sub(
+        r"(?P<lo>\d+)\s*(?:-|to|or)\s*(?P<hi>\d+)\s+(?P<unit>inputs?|bit|bits)\b",
+        _collapse_range, out, flags=re.IGNORECASE,
+    )
+    # "input are 1" → "inputs are 1" (subject-verb agreement fix the user often skips)
+    out = re.sub(r"\binput\s+are\b", "inputs are", out, flags=re.IGNORECASE)
+    out = re.sub(r"\binput\s+is\s+1\s+then\s+out", "inputs are 1 then output", out, flags=re.IGNORECASE)
+    # "then out is" → "then output is"
+    out = re.sub(r"\bthen\s+out\s+is\b", "then output is", out, flags=re.IGNORECASE)
+    # "when inputs are 1" with no explicit quantifier → "when all inputs are 1"
+    # (most natural reading — "when ANY input is 1" requires explicit "any/at least").
+    out = re.sub(r"\bwhen\s+inputs\s+are\s+([01])\b",
+                 r"when all inputs are \1", out, flags=re.IGNORECASE)
+    out = re.sub(r"\bwhen\s+all\s+all\s+inputs", "when all inputs", out, flags=re.IGNORECASE)
+    # "from N input(s)" / "with N input(s)" → "N-input circuit"
+    out = re.sub(r"\b(?:from|with)\s+(\d+)\s+inputs?\b",
+                 r"with \1 inputs", out, flags=re.IGNORECASE)
 
     # Discourse-marker rewrites  -  convert conjunctions that defeat the boolean
     # parser into ones it understands. Examples:
@@ -857,7 +1113,39 @@ def _nl_join(op, vs):
 
 
 def _logic_from_phrasing(text):
-    """English description -> (expression, name, description) or None."""
+    """English description -> (expression, name, description) or None.
+
+    Public entry point. Handles output-polarity (if the user wrote
+    "then output is 0", the result of the inner matcher is inverted) then
+    delegates to the raw matcher.
+    """
+    flip = False
+    m = re.search(
+        r"\bthen\s+(?:output|out|y\d*|z\d*)\s+(?:is|=|equals?|gives?|becomes?)?\s*"
+        r"(?P<val>0|zero|low|false|off)\b",
+        text, re.IGNORECASE)
+    inner_text = text
+    if m:
+        flip = m.group('val').lower() in ('0', 'zero', 'low', 'false', 'off')
+        inner_text = (text[:m.start()] + ' ' + text[m.end():]).strip()
+
+    res = _logic_from_phrasing_raw(inner_text)
+    if not flip or res is None:
+        return res
+    expr, name, desc = res
+    if expr.startswith('~(') and expr.endswith(')'):
+        new_expr = expr[2:-1]
+    else:
+        new_expr = f'~({expr})'
+    new_name = name[4:] if name.startswith('not ') else f'not {name}'
+    new_desc = (desc.replace('Output is high', 'Output is LOW')
+                    .replace('Output is the inverse', 'Output is')
+                + ' (Inverted — spec says "output is 0".)')
+    return (new_expr, new_name, new_desc)
+
+
+def _logic_from_phrasing_raw(text):
+    """Inner matcher — does NOT handle output polarity; see _logic_from_phrasing."""
     t = ' ' + text.lower().strip() + ' '
 
     # If the text says "three inputs"/"four lines", expand vs to that size.
@@ -867,6 +1155,54 @@ def _logic_from_phrasing(text):
         vs = (['A', 'B', 'C', 'D', 'E'])[:n_explicit]
     else:
         vs = detected or ['A', 'B']
+
+    # ── Generic threshold: "at least K of N inputs are 1" ────────────────────
+    # Enumerate all minterms with popcount in [K, N] and build the SOP.
+    m_thr = re.search(
+        r'\b(?:at\s+least|>=)\s+(?P<k>\d+)\s+(?:of\s+(?P<n>\d+)\s+)?(?:inputs?|of\s+them|of\s+the\s+inputs?)\s+(?:are|is)\s+(?:1|high|on)\b',
+        t, re.IGNORECASE)
+    if m_thr:
+        k = int(m_thr.group('k'))
+        n = int(m_thr.group('n')) if m_thr.group('n') else (n_explicit or len(vs))
+        n = max(n, k, 2)
+        vs_use = (['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'])[:n]
+        # Build the SOP: every minterm with popcount >= k.
+        terms = []
+        for mask in range(1 << n):
+            if bin(mask).count('1') < k:
+                continue
+            term_lits = []
+            for i, v in enumerate(vs_use):
+                bit = (mask >> (n - 1 - i)) & 1
+                term_lits.append(v if bit else f'~{v}')
+            terms.append('(' + ' & '.join(term_lits) + ')')
+        if terms:
+            return (' | '.join(terms),
+                    f'at least {k} of {n}',
+                    f'Output is high when at least {k} of {n} inputs are 1.')
+
+    # ── Generic threshold: "exactly K of N inputs are 1" ─────────────────────
+    m_exact = re.search(
+        r'\bexactly\s+(?P<k>\d+)\s+(?:of\s+(?P<n>\d+)\s+)?(?:inputs?|of\s+them)\s+(?:are|is)\s+(?:1|high|on)\b',
+        t, re.IGNORECASE)
+    if m_exact:
+        k = int(m_exact.group('k'))
+        n = int(m_exact.group('n')) if m_exact.group('n') else (n_explicit or len(vs))
+        n = max(n, k, 2)
+        vs_use = (['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'])[:n]
+        terms = []
+        for mask in range(1 << n):
+            if bin(mask).count('1') != k:
+                continue
+            term_lits = []
+            for i, v in enumerate(vs_use):
+                bit = (mask >> (n - 1 - i)) & 1
+                term_lits.append(v if bit else f'~{v}')
+            terms.append('(' + ' & '.join(term_lits) + ')')
+        if terms:
+            return (' | '.join(terms),
+                    f'exactly {k} of {n}',
+                    f'Output is high when exactly {k} of {n} inputs are 1.')
 
     # Normalise variable-laden phrases so substring matches work:
     #   "both A and B are 0" -> "both are 0"
@@ -1035,6 +1371,36 @@ def _logic_from_phrasing(text):
         return (f'({all_hi}) | ({all_lo})', 'all match',
                 f'Output is high when all {n_in} inputs share the same value.')
 
+    # -- "bigger/larger of A and B" / "max of A,B" -----------------------
+    # For 1-bit inputs, max(A,B) = A | B  (and min(A,B) = A & B).
+    if has('bigger of', 'larger of', 'greater of', 'maximum of',
+           ' max of ', 'whichever is larger', 'whichever is bigger'):
+        a, b = (vs + ['A', 'B'])[:2]
+        return (f'{a} | {b}', 'max',
+                f'For 1-bit inputs, the larger of {a} and {b} equals {a} OR {b}.')
+    if has('smaller of', 'lesser of', 'minimum of', ' min of ',
+           'whichever is smaller', 'whichever is lesser'):
+        a, b = (vs + ['A', 'B'])[:2]
+        return (f'{a} & {b}', 'min',
+                f'For 1-bit inputs, the smaller of {a} and {b} equals {a} AND {b}.')
+
+    # -- "more than half" / "strict majority" (3+ inputs) ----------------
+    if has('more than half', 'strict majority', 'most of', 'majority of'):
+        n_in = max(3, len(vs))
+        vs_eff = (['A', 'B', 'C', 'D', 'E'])[:n_in]
+        threshold = n_in // 2 + 1
+        # Enumerate every combination of `threshold` or more high inputs.
+        from itertools import combinations
+        terms = []
+        for k in range(threshold, n_in + 1):
+            for combo in combinations(range(n_in), k):
+                lits = [vs_eff[i] if i in combo else f'~{vs_eff[i]}'
+                        for i in range(n_in)]
+                terms.append('(' + ' & '.join(lits) + ')')
+        return (' | '.join(terms), 'majority',
+                f'Output high when more than half ({threshold}+) of '
+                f'{n_in} inputs are 1.')
+
     # -- XNOR / equality (2-input default) --------------------------------
     if has(' equal', ' same ', ' match', ' equivalent', ' identical',
            ' xnor', 'agree', 'both same', 'both equal'):
@@ -1156,9 +1522,18 @@ def _logic_from_phrasing(text):
                 f'Output is high when at least one input is high.')
 
     # -- NOT / invert -----------------------------------------------------
-    # Only match when there is exactly one variable and clear inversion intent.
-    if (has('invert', 'inverse', 'complement', 'negate', 'negation')
-            or re.search(r'\bnot\s+\w+\b', t)):
+    # The comment promised "only match when there is exactly one variable"
+    # but the code didn't enforce it — phrasings like "A AND NOT B" or
+    # "(A or B) and (not C)" matched here and produced `~A`, dropping the
+    # other operands. Now: only short-circuit to NOT when there is exactly
+    # one detected variable AND no binary operators ("and"/"or"/"xor") in
+    # the text. Otherwise fall through and let the boolean expression
+    # parser (further down) handle multi-operand expressions correctly.
+    explicit_invert = ('invert' in t or 'inverse' in t or 'complement' in t
+                       or 'negate' in t or 'negation' in t)
+    has_not_word    = bool(re.search(r'\bnot\s+\w+\b', t))
+    has_other_op    = bool(re.search(r'\b(and|or|xor|xnor|nand|nor|&|\||\^)\b', t))
+    if (explicit_invert or has_not_word) and len(vs) == 1 and not has_other_op:
         a = vs[0]
         return (f'~{a}', 'not', f'Output is the inverse of {a}.')
 
@@ -1458,6 +1833,141 @@ def _row_spec_from_text(text):
     return (expr, 'custom truth table', desc)
 
 
+def _value_set_from_text(text):
+    """
+    Parse phrases that name decimal values an input number takes, e.g.:
+      "ABC reads as 5 or 6 in binary"
+      "the input number is 3 or 5 or 7"
+      "when ABCD equals 1, 4 or 9"
+      "treat ABCD as 4 bit binary and output high when value is prime"
+    Returns (expression, name, desc) or None.
+    """
+    t = text.lower()
+
+    # Strip "<Y|output> (is|=) 1 when ..." prefix so the "1" doesn't get
+    # treated as a value the input number takes.
+    t = re.sub(
+        r'\b(?:y|output|result|out)\s*(?:is|=|equals?)\s*1\b\s*(?:when|if)?\s*',
+        '', t)
+
+    # Decide input width and variable names.
+    name_match = re.search(r'\b([A-D]{2,5})\b\s+(?:reads?|equals?|is|=)', text)
+    if name_match:
+        vs = list(name_match.group(1))         # 'ABC' -> ['A','B','C']
+    else:
+        # Look for "treat ABCD as 4 bit binary" / "ABCD as 4-bit binary"
+        m2 = re.search(r'\b([A-D]{2,5})\b\s+as\s+\d?\s*[-]?bit\s+binary', text)
+        if m2:
+            vs = list(m2.group(1))
+        else:
+            return None
+    width = len(vs)
+    if not (2 <= width <= 5):
+        return None
+    max_val = (1 << width) - 1
+
+    # Gather candidate values.
+    values = set()
+    label = None
+    if re.search(r'\bprime\b', t):
+        primes = [v for v in range(2, max_val + 1)
+                  if all(v % d for d in range(2, int(v**0.5) + 1))]
+        values.update(primes)
+        label = 'prime values'
+    if re.search(r'\b(?:even|divisible\s+by\s+2)\b', t):
+        values.update(v for v in range(max_val + 1) if v % 2 == 0)
+        label = 'even values'
+    if re.search(r'\bodd\b', t):
+        values.update(v for v in range(max_val + 1) if v % 2 == 1)
+        label = 'odd values'
+
+    # Explicit decimal numbers ("5 or 6", "1, 4 or 9").
+    nums = [int(n) for n in re.findall(r'\b(\d{1,2})\b', t)
+            if 0 <= int(n) <= max_val]
+    # Strip the width number itself if it appears as "4 bit" / "4-bit".
+    nums = [n for n in nums
+            if not re.search(rf'\b{n}\s*[-]?\s*bit\b', t)]
+    if nums and not label:
+        values.update(nums)
+        label = f'values {{{", ".join(str(n) for n in sorted(set(nums)))}}}'
+    elif nums and label:
+        values.update(nums)
+
+    if not values:
+        return None
+    values = sorted(v for v in values if 0 <= v <= max_val)
+
+    terms = []
+    for v in values:
+        bits = format(v, f'0{width}b')
+        lits = [name if b == '1' else f'~{name}'
+                for b, name in zip(bits, vs)]
+        terms.append('(' + ' & '.join(lits) + ')')
+    expr = ' | '.join(terms) if terms else '0'
+    desc = (f'Output is high when {"".join(vs)} reads as '
+            f'{label or ", ".join(str(v) for v in values)}.')
+    return (expr, 'value-set', desc)
+
+
+def _conditional_from_text(text):
+    """
+    Parse two-clause conditional specs of the form:
+      "output equals A when SEL is 0 and equals NOT B when SEL is 1"
+      "Y = A if SEL=0 else NOT B"
+      "result is A when SEL=0, otherwise NOT B"
+    Returns (expression, name, desc) or None.
+
+    Builds (~SEL & A) | (SEL & B) style expressions so the user gets a real
+    multiplexer-like circuit instead of just the first clause.
+    """
+    t = text.lower()
+    if not re.search(r'\b(when|if)\b.+?\b(when|else|otherwise|if)\b', t):
+        return None
+
+    # Find "<value-expr> when <cond>" clauses. Capture two of them.
+    clause_re = re.compile(
+        r'(?:equals?|is|=|gives?|outputs?)\s+'
+        r'(not\s+\w+|~\w+|\w+)\s+'
+        r'(?:when|if)\s+'
+        r'(\w+)\s*(?:is|=|equals?)\s*([01])',
+        re.IGNORECASE,
+    )
+    matches = clause_re.findall(text)
+    # Also handle "when SEL=1 output equals NOT B".
+    if len(matches) < 2:
+        rev_re = re.compile(
+            r'(?:when|if)\s+(\w+)\s*(?:is|=|equals?)\s*([01])\b'
+            r'.{0,40}?(?:equals?|is|=|gives?|outputs?)\s+(not\s+\w+|~\w+|\w+)',
+            re.IGNORECASE,
+        )
+        matches = [(val, sel, st) for (sel, st, val) in rev_re.findall(text)]
+    if len(matches) < 2:
+        return None
+
+    parsed = []
+    sel_name = None
+    for val, sel, state in matches[:2]:
+        v = val.strip()
+        v = re.sub(r'^not\s+', '~', v, flags=re.IGNORECASE)
+        sel = sel.upper()
+        if sel_name is None:
+            sel_name = sel
+        elif sel != sel_name:
+            return None    # two different selectors -> not a 2-clause cond
+        parsed.append((v, int(state)))
+    if not sel_name or len(parsed) != 2:
+        return None
+
+    parts = []
+    for v, st in parsed:
+        lit = sel_name if st == 1 else f'~{sel_name}'
+        parts.append(f'({lit} & ({v}))')
+    expr = ' | '.join(parts)
+    desc = (f'Output equals {parsed[0][0]} when {sel_name}={parsed[0][1]}, '
+            f'else {parsed[1][0]} when {sel_name}={parsed[1][1]}.')
+    return (expr, 'conditional', desc)
+
+
 def _minterms_from_text(text):
     """
     Build an SOP from binary input rows the user says produce a 1, e.g.
@@ -1642,8 +2152,10 @@ def _spec_from_text(text):
     in_names = ['A', 'B', 'C', 'D', 'E'][:n_in]
     out_names = [f'Y{i+1}' for i in range(n_out)]
 
-    # Per-output set of minterm rows that produce 1.
-    on_rows = [set() for _ in range(n_out)]
+    # Per-output set of minterm rows that produce 1, and the per-output set
+    # explicitly forced to 0 (used when the user wrote "then output is 0").
+    on_rows  = [set() for _ in range(n_out)]
+    off_rows = [set() for _ in range(n_out)]
 
     # Pull out every "when ..." segment. Splitting on "when" naturally
     # handles "and when" / ", when" / "; when" too. The preamble (text
@@ -1682,14 +2194,37 @@ def _spec_from_text(text):
         cons_outs   = _outputs_described(cons, n_out)
         clause_outs = _outputs_described(clause, n_out)
         outs = clause_outs if (clause_outs and len(clause_outs) < len(cons_outs or {None})) else (cons_outs or clause_outs)
+
+        # Polarity: does the consequent say the output is HIGH or LOW?
+        # "then output is 0", "then out is low", "then output is false" ⇒ LOW
+        # If LOW, the listed minterms must be EXCLUDED (output is 1 elsewhere).
+        cons_says_low = bool(re.search(
+            r"\b(?:output|out|y\d*|z\d*)\s+(?:is|=|equals?|gives?|becomes?)?\s*"
+            r"(?:0|zero|low|false|off)\b|"
+            r"\b(?:then|so|thus)\s+(?:0|zero|low|false|off)\b",
+            cons, re.IGNORECASE))
+
         if mts and outs:
             saw_clause = True
             for mt in mts:
                 idx = int(mt, 2)
                 for oi in outs:
-                    on_rows[oi].add(idx)
+                    if cons_says_low:
+                        off_rows[oi].add(idx)
+                    else:
+                        on_rows[oi].add(idx)
     if not saw_clause:
         return None
+
+    # If the user said "when X then output is 0" without any other clauses,
+    # the result is the complement of the off-rows over the full minterm space.
+    N = 1 << n_in
+    for i in range(n_out):
+        if not on_rows[i] and off_rows[i]:
+            on_rows[i] = set(range(N)) - off_rows[i]
+        elif off_rows[i]:
+            # Both clauses present — drop any "off" rows from the "on" set.
+            on_rows[i] -= off_rows[i]
 
     parts = []
     for label, ones in zip(out_names, on_rows):
@@ -1807,37 +2342,77 @@ class QuestionSolver:
           2. Hand-written regex rules as a fallback for low-confidence cases.
         """
         question_lower = question.lower().strip()
-        intent = self._classify_intent(question_lower)
+
+        # ─── Knowledge-base shortcut ─────────────────────────────────────────
+        # Canonical digital-logic / SDE-interview questions ("what is propagation
+        # delay", "explain NAND universality", "De Morgan's law", …) get a
+        # polished textbook answer regardless of how the intent classifier
+        # would have routed them. The intent classifier was trained mostly on
+        # circuit-manipulation phrasings and tends to misroute these to
+        # `output_query`, so we bypass it for concept questions.
+        #
+        # CRITICAL: skip the KB shortcut when the user explicitly asks to BUILD
+        # something. Otherwise "build a half adder" would match the "Adders"
+        # KB pattern and return a textbook paragraph instead of synthesizing
+        # the circuit.
+        _BUILD_VERBS = (
+            r'^\s*(?:please\s+|pls\s+|plz\s+|hey\s+|hi\s+|yo\s+|um\s+|so\s+)?'
+            r'(?:can\s+(?:you|u)\s+|could\s+(?:you|u)\s+|i\s+(?:want|need|wanna|wish)\s+(?:to\s+)?|'
+            r'i\'?d\s+like\s+(?:to\s+)?|gimme\s+|give\s+me\s+(?:an?\s+)?|'
+            r'show\s+me\s+(?:an?\s+)?|let\'?s\s+|how\s+(?:do|to|can)\s+i\s+)?'
+            r'(?:build|make|design|create|construct|generate|draw|wire\s+up|'
+            r'synthesize|synthesise|implement|assemble|sketch|put\s+together|'
+            r'render|produce|set\s+up|i\s+want|i\s+need)\b'
+        )
+        is_build_request = bool(re.search(_BUILD_VERBS, question_lower))
+
+        # Also skip if the question describes a behaviour to implement
+        # ("output is 1 when …", "Y=1 when A=…", "when all inputs are 1 …").
+        is_behaviour_spec = bool(re.search(
+            r'\b(?:output|out|y\d*|z\d*)\s+(?:is|=|equals?)\s+[01]\b|'
+            r'\b(?:y|z)\s*=\s*[01]\s+when\b|'
+            r'\bwhen\s+(?:all|any|every|exactly|at\s+least|at\s+most|some)\b.*\b(?:then|gives?|outputs?|=)\b',
+            question_lower))
+
+        if not is_build_request and not is_behaviour_spec:
+            kb = self._try_knowledge_base(question_lower)
+            if kb is not None:
+                kb.setdefault('intent', 'concept')
+                kb['intent_confidence'] = 0.95
+                kb['ml_source']         = 'knowledge_base'
+                return kb
+
+        intent, conf, source = self._classify_intent_detailed(question_lower)
 
         # Extract any input values mentioned in question
         input_overrides = self._extract_inputs(question_lower)
 
         if intent == 'build':
-            return self.build_from_text(question)
-
-        if intent == 'output_query' or intent == 'input_effect':
-            return self._answer_output_query(question, circuit, input_overrides)
-
+            result = self.build_from_text(question)
+        elif intent == 'output_query' or intent == 'input_effect':
+            result = self._answer_output_query(question, circuit, input_overrides)
         elif intent == 'gate_count':
-            return self._answer_gate_count(circuit)
-
+            result = self._answer_gate_count(circuit)
         elif intent == 'gate_type':
-            return self._answer_gate_type(question, circuit)
-
+            result = self._answer_gate_type(question, circuit)
         elif intent == 'minimize':
-            return self._answer_minimize(circuit)
-
+            result = self._answer_minimize(circuit)
         elif intent == 'fault_check':
-            return self._answer_fault_check(circuit)
-
+            result = self._answer_fault_check(circuit)
         elif intent == 'what_if':
-            return self._answer_what_if(question, circuit)
-
+            result = self._answer_what_if(question, circuit)
         elif intent == 'explain':
-            return self._answer_explain(circuit)
-
+            result = self._answer_explain(circuit, question)
         else:
-            return self._answer_general(question, circuit)
+            result = self._answer_general(question, circuit)
+
+        # Always expose ML metadata so the UI can show what model decided what.
+        # If a handler already set 'confidence' (e.g. fault-detector probability),
+        # keep it and surface the intent confidence separately.
+        result.setdefault('intent', intent)
+        result['intent_confidence'] = round(float(conf), 3)
+        result['ml_source']         = source       # 'ml' | 'regex' | 'fallback'
+        return result
 
     # -- Intent classifier -----------------------------------------------------
     #
@@ -1861,21 +2436,32 @@ class QuestionSolver:
         return cls._ml_intent or None
 
     def _classify_intent(self, q: str) -> str:
+        intent, _, _ = self._classify_intent_detailed(q)
+        return intent
+
+    def _classify_intent_detailed(self, q: str):
+        """
+        Returns (intent, confidence, source).
+
+        source ∈ {'ml', 'regex', 'fallback'} — tells the UI which model decided.
+        """
         ml = self._get_ml_intent()
         if ml is not None:
             intent, conf = ml.classify(q)
             if conf >= getattr(ml, 'LOW_CONF', 0.30):
-                return intent
+                return intent, conf, 'ml'
 
-        # Regex fallback (legacy).
+        # Regex fallback (legacy)
         scores = {}
         for intent, patterns in self.patterns.items():
             score = sum(1 for p in patterns if re.search(p, q))
             if score > 0:
                 scores[intent] = score
         if not scores:
-            return 'general'
-        return max(scores, key=scores.get)
+            return 'general', 0.0, 'fallback'
+        winner = max(scores, key=scores.get)
+        total  = sum(scores.values())
+        return winner, scores[winner] / total, 'regex'
 
     def _extract_inputs(self, q: str) -> dict:
         """Extract A=1, B=0 etc from question text."""
@@ -2091,12 +2677,38 @@ class QuestionSolver:
         return {'answer': 'Could not simulate change.', 'confidence': 0,
                 'details': {}, 'suggestions': []}
 
-    def _answer_explain(self, circuit: dict) -> dict:
+    def _answer_explain(self, circuit: dict, question: str = '') -> dict:
+        # If the question is a "what is X" / "explain Y" about a concept, prefer
+        # the knowledge-base answer over the circuit-stats dump.
+        if question:
+            kb = self._try_knowledge_base(question)
+            if kb is not None:
+                return kb
+
         gates   = circuit.get('gates', [])
         wires   = circuit.get('wires', [])
         logic   = [g for g in gates if g['type'].upper() not in ('INPUT','CLOCK','OUTPUT')]
         inputs  = [g for g in gates if g['type'].upper() in ('INPUT','CLOCK')]
         outputs = [g for g in gates if g['type'].upper() == 'OUTPUT']
+
+        # Empty circuit + concept-style question — defer to general handler so the
+        # user gets useful suggestions instead of a uninformative "0 gates" dump.
+        if not gates:
+            return {
+                'answer': ("There's no circuit on the canvas yet. Try asking about a digital-logic "
+                           "concept (\"what is XOR\", \"explain NAND universality\", \"how do flip-flops work\"), "
+                           "or place some gates and ask me to explain them."),
+                'confidence': 0.6,
+                'details': {'circuit_size': 0},
+                'suggestions': [
+                    'What is an XOR gate?',
+                    'Explain NAND universality.',
+                    'How do flip-flops work?',
+                    'What is propagation delay?',
+                    'Difference between Mealy and Moore machines?',
+                    'Build a half adder.',
+                ]
+            }
 
         type_counts = {}
         for g in logic:
@@ -2295,7 +2907,8 @@ class QuestionSolver:
         bare = re.sub(
             r'^\s*(please\s+)?(build|make|design|create|construct|generate|'
             r'give me|show me|i want|i need|made)\s*'
-            r'(a|an|the)?\s*(circuit\s+for\s+)?', '', body, flags=re.I)
+            r'(?:(?:a|an|the)\s+(?=[A-Za-z]{2}))?\s*(circuit\s+for\s+)?',
+            '', body, flags=re.I)
         bare = re.sub(r'\b(gate|gates|logic)\b', '', bare, flags=re.I)
         bare = bare.strip().rstrip('.?!').upper()
         if bare in BARE_GATE_EXPR:
@@ -2329,7 +2942,11 @@ class QuestionSolver:
         direct_body = re.sub(
             r'^\s*(please\s+)?(build|make|design|create|construct|generate|'
             r'give me|show me|i want|i need|circuit\s+for)\s*'
-            r'(a|an|the)?\s*(circuit\s+for\s+)?', '', body, flags=re.I).strip().rstrip('.?!')
+            r'(?:(?:a|an|the)\s+(?=[A-Za-z]{2}))?\s*(circuit\s+for\s+)?',
+            '', body, flags=re.I).strip().rstrip('.?!')
+        # Also strip a bare leading "circuit for" when no verb preceded it
+        # (e.g. "circuit for A + B" -> "A + B").
+        direct_body = re.sub(r'^\s*circuit\s+for\s+', '', direct_body, flags=re.I).strip()
         looks_like_expr = (
             direct_body
             and not re.search(r'\b(when|if|for|while|unless|only)\b', direct_body, re.I)
@@ -2337,9 +2954,18 @@ class QuestionSolver:
             and not re.search(r'=\s*[01]', direct_body)     # no "A=1"
         )
         if looks_like_expr:
+            # Translate engineering-notation booleans (+ for OR, . for AND, '
+            # for NOT) into the parser's syntax. Only do this when the body
+            # contains at least one `+`, `.`, or trailing-quote-NOT - otherwise
+            # we'd corrupt normal expressions like "A & B".
+            normalized_expr = direct_body
+            if re.search(r"[A-Za-z]\s*[+.]\s*[A-Za-z]|[A-Za-z]'", direct_body):
+                normalized_expr = re.sub(r"\+", " | ", normalized_expr)
+                normalized_expr = re.sub(r"(?<=\w)\.(?=\w)", " & ", normalized_expr)
+                normalized_expr = re.sub(r"([A-Za-z]\w*)'", r"~\1", normalized_expr)
             try:
                 circuit, info = self.boolean_synth.build(
-                    direct_body, target_gates=target)
+                    normalized_expr, target_gates=target)
                 if info.get('gate_count', 0) > 0:
                     simp = info.get('simplified', direct_body)
                     return {
@@ -2411,6 +3037,32 @@ class QuestionSolver:
                     'suggestions': ["Press RUN to simulate."],
                 }
 
+        # 1c.5b Two-clause conditional ("A when SEL=0 else NOT B when SEL=1").
+        #       Tried before the row-spec parser so its "SEL is 0/1" doesn't
+        #       get misread as a binary truth-table row.
+        cond = _conditional_from_text(body)
+        if cond is not None:
+            cexpr, cname, cdesc = cond
+            try:
+                circuit, info = self.boolean_synth.build(cexpr, target_gates=target)
+            except BooleanParseError as e:
+                if target:
+                    return self._impossible_target_answer(cname, target, str(e))
+                circuit = info = None
+            if circuit is not None and info.get('gate_count', 0) > 0:
+                simp = info.get('simplified', cexpr)
+                simp_note = ('' if info.get('is_simplest')
+                             else f' Simplifies to **{simp}**.')
+                return {
+                    'answer': f'{cdesc} Boolean: `{cexpr}`.{simp_note} '
+                              f"Built {info['gate_count']} logic gate"
+                              f"{'s' if info['gate_count'] != 1 else ''}, "
+                              f"{info['wire_count']} wires.",
+                    'confidence': 0.9,
+                    'circuit': circuit, 'info': info, 'details': info,
+                    'suggestions': ["Press RUN to simulate."],
+                }
+
         # 1c.6  Explicit row-by-row truth-table spec
         #       ("input 1 gives 0 and input 0 gives 1",
         #        "when A=0 B=1 output is 1, when A=1 B=0 output is 1").
@@ -2479,7 +3131,10 @@ class QuestionSolver:
         #     of three"). Minterm rows are tried first because phrases like
         #     "1 for 00 and 11" contain the word "and" which the phrasing
         #     matcher would otherwise misread.
-        nl = _minterms_from_text(body) or _logic_from_phrasing(body)
+        nl = (_value_set_from_text(body)
+              or _conditional_from_text(body)
+              or _minterms_from_text(body)
+              or _logic_from_phrasing(body))
         if nl is not None:
             expr, nl_name, nl_desc = nl
             try:
@@ -2722,19 +3377,333 @@ class QuestionSolver:
         }
         return circuit, info
 
+    # ── Digital-logic knowledge base ────────────────────────────────────────
+    # Polished answers for canonical interview / textbook questions.  Each
+    # entry is (pattern, title, body).  First-match wins; patterns are
+    # checked in order so put more specific ones first.
+
+    _KB: list = [
+        (r'\bnand\b.*\b(universal|complete)|\b(universal|complete)\w*\b.*\bnand\b',
+         'NAND universality',
+         "NAND is a *universal* gate — every Boolean function can be built using only NANDs.\n\n"
+         "• NOT(A)   = A NAND A\n"
+         "• AND(A,B) = NOT(A NAND B) = (A NAND B) NAND (A NAND B)\n"
+         "• OR(A,B)  = NOT(NOT A) OR NOT(NOT B) = (A NAND A) NAND (B NAND B)  (De Morgan)\n\n"
+         "Because {NOT, AND, OR} is itself functionally complete, deriving all three from NAND proves NAND is universal. "
+         "NOR is universal by symmetry."),
+
+        (r'\bnor\b.*\b(universal|complete)|\b(universal|complete)\w*\b.*\bnor\b',
+         'NOR universality',
+         "NOR is universal — like NAND, every Boolean function can be built from NORs alone.\n\n"
+         "• NOT(A)   = A NOR A\n"
+         "• OR(A,B)  = NOT(A NOR B) = (A NOR B) NOR (A NOR B)\n"
+         "• AND(A,B) = (A NOR A) NOR (B NOR B)\n\n"
+         "NOR-only design was historically common in CMOS because PMOS pull-up networks favour series transistors."),
+
+        (r"\bde\s*morgan", 'De Morgan\'s laws',
+         "De Morgan's two laws:\n"
+         "  ¬(A ∧ B) = ¬A ∨ ¬B      i.e.   NOT(A AND B) = (NOT A) OR (NOT B)\n"
+         "  ¬(A ∨ B) = ¬A ∧ ¬B      i.e.   NOT(A OR B)  = (NOT A) AND (NOT B)\n\n"
+         "They turn AND into OR (and vice-versa) when you push a NOT inside. "
+         "Used constantly when re-expressing circuits in NAND-only or NOR-only form."),
+
+        (r'\bpropagation\s+delay\b|\bt_pd\b',
+         'Propagation delay',
+         "Propagation delay (t_pd) is the time from an input transition until the corresponding output transition reaches a valid logic level. "
+         "For a circuit it is the *worst-case longest path* through the gates from inputs to outputs.\n\n"
+         "• Used to compute the maximum clock frequency: f_max ≈ 1 / (t_pd + t_setup + t_clk-q).\n"
+         "• Distinct from contamination delay (t_cd) — the shortest path, which sets hold-time slack."),
+
+        (r'\b(race\s*condition|race\s*hazard|critical\s*race)',
+         'Race condition',
+         "A race condition in sequential logic occurs when two inputs change at nearly the same time and the final state depends on which change *wins*.\n\n"
+         "Classical example: SR latch driven so that S and R both go 1→0; the latch may end in 0, 1, or oscillate. "
+         "Mitigations:\n"
+         "  • Use master-slave or edge-triggered flip-flops instead of latches.\n"
+         "  • Synchronous design — all signals change on the clock edge.\n"
+         "  • Avoid logic where two paths re-converge after asymmetric delays."),
+
+        (r'\b(setup|hold)\s+time\b',
+         'Setup & hold time',
+         "Setup time (t_su): the data input must be stable for t_su BEFORE the active clock edge.\n"
+         "Hold time  (t_h):  the data input must remain stable for t_h AFTER the active clock edge.\n\n"
+         "Violating setup → the flip-flop may go metastable. Violating hold → the latched value is corrupted by the next-cycle data."),
+
+        (r'\b(metastab|metastability)',
+         'Metastability',
+         "When a flip-flop samples an input that is changing inside the setup/hold window, it can enter a metastable state — an indeterminate voltage between 0 and 1 that resolves to either value after an unpredictable delay. "
+         "Mitigated by:\n"
+         "  • Synchroniser chains (2- or 3-stage FF pipeline) — exponentially reduce MTBF.\n"
+         "  • Slower clock relative to the metastability resolution time τ."),
+
+        (r'\b(latch).*\bflip[\s-]?flop\b|\bflip[\s-]?flop\b.*\b(latch)|difference.*latch.*flip|flip.*vs.*latch',
+         'Latch vs flip-flop',
+         "Latch: level-sensitive — the output follows the input the whole time the enable signal is asserted.\n"
+         "Flip-flop: edge-triggered — the output samples the input only at the rising (or falling) clock edge.\n\n"
+         "Flip-flops are race-immune, easier to time-analyse, and preferred for synchronous design. Latches are smaller (~½ the transistors) and used for retiming or low-power clock-gating."),
+
+        (r'\b(master[\s-]?slave|master\s+slave\s+flip)',
+         'Master-slave flip-flop',
+         "Two latches in series with inverted enables:\n"
+         "  • The MASTER latch is transparent while CLK = 0; it captures D.\n"
+         "  • The SLAVE  latch is transparent while CLK = 1; it forwards the master's value to Q.\n\n"
+         "Net effect: edge-triggered behaviour. Q updates on the 0→1 clock transition. Eliminates the latch's transparency-window race condition."),
+
+        (r'\b(karnaugh|k[\s-]?map)\b',
+         'Karnaugh map',
+         "A K-map is a 2-D grid laid out in Gray code so adjacent cells differ in exactly one variable. "
+         "Used to minimise Boolean expressions visually:\n\n"
+         "1. Fill each cell with the function value (0/1/X).\n"
+         "2. Group 1-cells in rectangles of size 1, 2, 4, 8… (must be power of two).\n"
+         "3. Each group becomes one product term — variables that change inside the group are eliminated.\n\n"
+         "Equivalent to the algebraic Quine-McCluskey algorithm but tractable by hand up to ~4 variables."),
+
+        (r'\b(sop|sum\s*of\s*products)\b',
+         'Sum of Products (SOP)',
+         "SOP form: f = Σ (minterms where f = 1). Each minterm is an AND of all input variables (negated where the input is 0). "
+         "Example for f(A,B) = 1 on inputs 01 and 10:  f = A'·B + A·B'.\n\n"
+         "Canonical SOP is the disjunction of every minterm of the function; minimised SOP groups adjacent minterms via K-map or Quine-McCluskey."),
+
+        (r'\b(pos|product\s*of\s*sums)\b',
+         'Product of Sums (POS)',
+         "POS form: f = Π (maxterms where f = 0). Each maxterm is an OR of all variables (negated where the input is 1). "
+         "Dual to SOP — useful when the function has more 1s than 0s, because POS will have fewer terms."),
+
+        (r'\b(combinational|combinatorial)\b.*\bsequential\b|\bsequential\b.*\bcombinational',
+         'Combinational vs sequential circuits',
+         "Combinational: output depends only on current inputs. No memory. Examples: adders, multiplexers, decoders.\n"
+         "Sequential:    output depends on current inputs AND past history (state). Built from flip-flops or latches plus combinational logic. Examples: counters, FSMs, registers."),
+
+        (r'\b(mealy|moore)\b',
+         'Mealy vs Moore machines',
+         "Both are FSMs.\n"
+         "  • Moore — outputs depend only on the current state. Cleaner, output is glitch-free, but typically uses more states.\n"
+         "  • Mealy — outputs depend on (state, input). Fewer states, responds in the same cycle, but more prone to combinational glitches."),
+
+        (r'\b(half|full)\s+adder\b',
+         'Adders',
+         "Half adder:  A,B → Sum = A⊕B, Carry = A·B.  Two gates (XOR + AND).\n"
+         "Full adder:  A,B,Cin → Sum = A⊕B⊕Cin, Cout = (A·B) + (Cin·(A⊕B)).\n\n"
+         "Ripple-carry n-bit adder chains n full adders; carry propagates through every FA, delay O(n). "
+         "Carry-lookahead, carry-save, and Kogge-Stone adders reduce this to O(log n) or O(1) latency."),
+
+        (r'\b(mux|multiplexer)\b',
+         'Multiplexer',
+         "A 2ⁿ:1 mux selects one of 2ⁿ data inputs via n select lines.\n"
+         "  2:1: Y = S'·D0 + S·D1\n"
+         "  4:1: Y = S1'S0'·D0 + S1'S0·D1 + S1S0'·D2 + S1S0·D3\n\n"
+         "Muxes are functionally complete (any Boolean function of n vars can be implemented with one 2ⁿ:1 mux)."),
+
+        (r'\b(decoder|encoder)\b',
+         'Decoders & encoders',
+         "n-to-2ⁿ decoder: drives exactly one of 2ⁿ outputs high, selected by the n-bit input.\n"
+         "  Used inside memories (address → wordline) and as the heart of demultiplexers.\n\n"
+         "Priority encoder: 2ⁿ-to-n encoder that, when multiple inputs are high, emits the index of the highest-priority asserted input. "
+         "Critical in interrupt controllers."),
+
+        (r'\b(parity)\b',
+         'Parity generator/checker',
+         "Even-parity bit P over n data bits = XOR of all bits → forces the total number of 1s including P to be even.\n"
+         "Odd parity inverts it (P = XNOR-chain).\n\n"
+         "Detects any single-bit error but not double-bit; superseded by Hamming codes for stronger correction."),
+
+        (r'\b(carry\s*look[\s-]?ahead|cla)\b',
+         'Carry-lookahead adder',
+         "For each bit i: Generate Gi = Ai·Bi, Propagate Pi = Ai⊕Bi. Then\n"
+         "  Ci+1 = Gi + Pi·Ci\n"
+         "Flattened: C1 = G0 + P0·C0; C2 = G1 + P1·G0 + P1·P0·C0; …\n"
+         "Carry propagation collapses from O(n) ripple to O(log n) with hierarchical CLA blocks."),
+
+        (r'\b(tri[\s-]?state|three[\s-]?state)\b',
+         'Tri-state buffer',
+         "A buffer with an enable input. When EN = 1 it passes the input to the output; when EN = 0 it presents high-impedance (Z) — effectively disconnecting from the bus.\n"
+         "Tri-state buffers let multiple drivers share a single wire (bus); only one is enabled at a time."),
+
+        # ── Individual gates ─────────────────────────────────────────────────
+        # Permissive — match "what is xor", "explain xor", "xor gate", "what's an or", etc.
+        (r'\b(what.{0,5}is|explain|describe|tell\s+me\s+about|how.{0,5}does|define|teach\s+me|what\'s)\s.{0,20}\band(\s+gate)?\b|\band\s+gate\b',
+         'AND gate',
+         "AND outputs 1 only when **all** inputs are 1.\n\n"
+         "Truth table (2-input):\n"
+         "  A B │ Y\n"
+         "  0 0 │ 0\n"
+         "  0 1 │ 0\n"
+         "  1 0 │ 0\n"
+         "  1 1 │ 1\n\n"
+         "Boolean: Y = A·B. Symbol: D-shape with flat back and semicircular front. Used as the conjunction primitive in every Boolean expression."),
+
+        (r'\b(what.{0,5}is|explain|describe|tell\s+me\s+about|how.{0,5}does|define|teach\s+me|what\'s)\s.{0,20}\bor(\s+gate)?\b|\bor\s+gate\b',
+         'OR gate',
+         "OR outputs 1 when **any** input is 1.\n\n"
+         "Truth table (2-input):\n"
+         "  A B │ Y\n"
+         "  0 0 │ 0\n"
+         "  0 1 │ 1\n"
+         "  1 0 │ 1\n"
+         "  1 1 │ 1\n\n"
+         "Boolean: Y = A + B. Distinctive shape: curved concave back, convex top/bottom, pointed tip."),
+
+        (r'\b(what.{0,5}is|explain|describe|tell\s+me\s+about|how.{0,5}does|define|teach\s+me|what\'s)\s.{0,20}\bnot(\s+gate)?\b|\bnot\s+gate\b|\binverter\b',
+         'NOT gate (inverter)',
+         "NOT inverts its single input.\n\n"
+         "  A │ Y\n"
+         "  0 │ 1\n"
+         "  1 │ 0\n\n"
+         "Boolean: Y = ¬A (or A'). Symbol: triangle pointing right with a small bubble at the tip — the triangle is the buffer, the bubble is the inversion. Without the bubble it's a BUF (non-inverting buffer)."),
+
+        (r'\b(what.{0,5}is|explain|describe|tell\s+me\s+about|how.{0,5}does|define|teach\s+me|what\'s)\s.{0,20}\bnand(\s+gate)?\b|\bnand\s+gate\b',
+         'NAND gate',
+         "NAND = NOT AND. Outputs 0 only when **all** inputs are 1; otherwise outputs 1.\n\n"
+         "  A B │ Y\n"
+         "  0 0 │ 1\n"
+         "  0 1 │ 1\n"
+         "  1 0 │ 1\n"
+         "  1 1 │ 0\n\n"
+         "Boolean: Y = ¬(A·B). NAND is **functionally complete** — every Boolean function can be built using only NAND gates. Cheapest gate in CMOS (4 transistors)."),
+
+        (r'\b(what.{0,5}is|explain|describe|tell\s+me\s+about|how.{0,5}does|define|teach\s+me|what\'s)\s.{0,20}\bnor(\s+gate)?\b|\bnor\s+gate\b',
+         'NOR gate',
+         "NOR = NOT OR. Outputs 1 only when **all** inputs are 0.\n\n"
+         "  A B │ Y\n"
+         "  0 0 │ 1\n"
+         "  0 1 │ 0\n"
+         "  1 0 │ 0\n"
+         "  1 1 │ 0\n\n"
+         "Boolean: Y = ¬(A + B). Also functionally complete. Used to build SR latches."),
+
+        (r'\b(what.{0,5}is|explain|describe|tell\s+me\s+about|how.{0,5}does|define|teach\s+me|what\'s)\s.{0,20}\bxor(\s+gate)?\b|\bxor\s+gate\b|^\s*xor\s*\??\s*$',
+         'XOR gate (exclusive OR)',
+         "XOR outputs 1 when its inputs **differ**.\n\n"
+         "  A B │ Y\n"
+         "  0 0 │ 0\n"
+         "  0 1 │ 1\n"
+         "  1 0 │ 1\n"
+         "  1 1 │ 0\n\n"
+         "Boolean: Y = A ⊕ B = A·B' + A'·B. Key building block of adders (Sum = A⊕B⊕Cin), parity generators, and Gray-code converters. Distinctive shape is OR-gate + extra back arc."),
+
+        (r'\b(what.{0,5}is|explain|describe|tell\s+me\s+about|how.{0,5}does|define|teach\s+me|what\'s)\s.{0,20}\bxnor(\s+gate)?\b|\bxnor\s+gate\b|\bequivalence\s+gate\b',
+         'XNOR gate (equivalence)',
+         "XNOR outputs 1 when its inputs are **equal** — it's the NOT of XOR.\n\n"
+         "  A B │ Y\n"
+         "  0 0 │ 1\n"
+         "  0 1 │ 0\n"
+         "  1 0 │ 0\n"
+         "  1 1 │ 1\n\n"
+         "Boolean: Y = A ⊙ B = A·B + A'·B'. Used in equality comparators and parity checkers."),
+
+        (r'\bbuf(fer)?\s+gate\b|\bwhat\s+is\s+(a\s+)?buf\b|\bnon[-\s]?inverting\s+buffer\b',
+         'Buffer (BUF)',
+         "Buffer passes the input straight through: Y = A. Same shape as NOT but without the inversion bubble.\n\n"
+         "Used for signal regeneration on long wires, fan-out boosting, and clock-tree balancing. Also the basis of tri-state buffers when an enable input is added."),
+
+        # ── Sequential circuits ──────────────────────────────────────────────
+        (r'\b(what.{0,5}is|explain|describe|tell\s+me\s+about|how.{0,5}does|define)\s.{0,20}\b(a\s+|an\s+)?flip[\s-]?flop\b',
+         'Flip-flop',
+         "A flip-flop is a 1-bit edge-triggered memory element — the basic storage cell of synchronous digital logic. "
+         "It samples its data input on each active clock edge and holds that value until the next edge.\n\n"
+         "Four common types:\n"
+         "  • D-FF   — Q(next) = D    (delays input by one clock cycle)\n"
+         "  • JK-FF  — toggles when J=K=1; otherwise behaves like SR (no invalid state)\n"
+         "  • T-FF   — toggles Q on every edge when T=1\n"
+         "  • SR-FF  — set/reset (raw S=R=1 is invalid)\n\n"
+         "Used as the storage element in registers, counters, and finite-state machines."),
+
+        (r'\bsr\s+(latch|flip)\b|\bs[\s-]?r\s+(latch|flip[\s-]?flop)\b',
+         'SR latch',
+         "Set-Reset latch — the simplest 1-bit memory. Two cross-coupled NOR gates (or NANDs with active-low S̄/R̄).\n\n"
+         "  S R │ Q   Q̅\n"
+         "  0 0 │ Q   Q̅   (hold)\n"
+         "  0 1 │ 0   1   (reset)\n"
+         "  1 0 │ 1   0   (set)\n"
+         "  1 1 │ 0   0   (invalid — both outputs forced 0; race when freed)"),
+
+        (r'\bd\s+(latch|flip[\s-]?flop)\b',
+         'D flip-flop / D latch',
+         "D latch: level-sensitive. Q = D while the enable is high; Q holds when enable goes low. One D input avoids the S=R=1 invalid state of the SR latch.\n\n"
+         "D flip-flop: edge-triggered version. On every active clock edge, samples D and presents it on Q for the next cycle. The basic building block of synchronous registers."),
+
+        (r'\bjk\s+(flip[\s-]?flop|latch)\b|\bj[\s-]?k\s+(flip[\s-]?flop|latch)\b',
+         'JK flip-flop',
+         "Universal flip-flop, no invalid state.\n\n"
+         "  J K │ Q(next)\n"
+         "  0 0 │ Q       (hold)\n"
+         "  0 1 │ 0       (reset)\n"
+         "  1 0 │ 1       (set)\n"
+         "  1 1 │ Q̅       (toggle)\n\n"
+         "When J=K=1 in a master-slave or edge-triggered design, Q toggles each clock edge — the basis of asynchronous counters."),
+
+        (r'\bt\s+flip[\s-]?flop\b|\btoggle\s+flip',
+         'T flip-flop (toggle)',
+         "Single-input flip-flop: T=1 toggles Q on every clock edge, T=0 holds. Equivalent to a JK with J and K tied together. Used to build ripple counters (each T-FF divides frequency by 2)."),
+
+        (r'\bshift\s+register\b',
+         'Shift register',
+         "Chain of D flip-flops with the Q of each driving the D of the next, all sharing one clock. Each rising edge shifts the data one position.\n\n"
+         "Variants:\n"
+         "  • SISO — serial in, serial out (delay line)\n"
+         "  • SIPO — serial in, parallel out (UART deserialiser)\n"
+         "  • PISO — parallel in, serial out (UART serialiser)\n"
+         "  • PIPO — parallel in/out (synchronous register file)"),
+
+        (r'\b(ring|johnson)\s+counter\b',
+         'Ring & Johnson counters',
+         "Ring counter: shift register where the last Q feeds back to the first D. n flip-flops → n unique one-hot states.\n\n"
+         "Johnson (twisted-ring) counter: same loop but feeds back the *inverted* Q. n flip-flops → 2n unique states. Glitch-free decoding, used for low-power counters and stepper-motor drivers."),
+
+        (r'\b(synchronous|asynchronous)\s+counter\b|\bripple\s+counter\b',
+         'Synchronous vs asynchronous counters',
+         "Async (ripple) counter: each flip-flop is clocked by the previous Q. Simple, but propagation delays accumulate → high-bit transitions appear later than low bits.\n\n"
+         "Sync counter: all FFs share the master clock; combinational logic decides which FFs toggle each edge. More gates, but every output updates simultaneously — suitable for high-speed and as state registers in FSMs."),
+
+        # ── Number systems & arithmetic ─────────────────────────────────────
+        (r'\b(2|two)[\'s]?\s+complement\b',
+         "Two's complement",
+         "Standard signed-integer representation. For n bits, the value of bits b_{n-1}…b_0 is:\n"
+         "    -b_{n-1}·2^{n-1} + Σ b_i·2^i\n\n"
+         "Negation: invert all bits then add 1. Range for n bits: −2^{n-1} … 2^{n-1}−1. Addition/subtraction use the *same* binary adder — no separate sign handling. Universal in modern CPUs."),
+
+        (r'\b(bcd|binary[\s-]?coded[\s-]?decimal)\b',
+         'BCD (binary-coded decimal)',
+         "Each decimal digit (0–9) is encoded in 4 bits: 0000–1001. Codes 1010–1111 are invalid.\n\n"
+         "BCD → 7-segment decoders drive 7-segment displays directly. Banking and calculator hardware historically used BCD arithmetic because exact decimal rounding matters."),
+        (r'\bhazard|glitch\b',
+         'Hazards',
+         "A logic hazard is a brief, unintended output transition caused by uneven gate delays.\n"
+         "  • Static-1 hazard: output should stay 1 but momentarily dips to 0.\n"
+         "  • Static-0 hazard: stays 0 but blips to 1.\n"
+         "  • Dynamic hazard:   multiple unintended transitions during one logical change.\n\n"
+         "Static-1 hazards are removed by adding redundant prime implicants to the SOP (the 'consensus' term)."),
+    ]
+
+    def _try_knowledge_base(self, q: str):
+        for pat, title, body in self._KB:
+            if re.search(pat, q, re.IGNORECASE):
+                return {'answer': f"**{title}**\n\n{body}",
+                        'confidence': 0.95,
+                        'details': {'kb_match': title}}
+        return None
+
     def _answer_general(self, question: str, circuit: dict) -> dict:
+        # Try the digital-logic KB first — handles canonical SDE/analyst questions.
+        kb = self._try_knowledge_base(question)
+        if kb is not None:
+            return kb
+
         gates = circuit.get('gates', [])
         logic = [g for g in gates if g['type'].upper() not in ('INPUT','CLOCK','OUTPUT')]
         return {
-            'answer': f"I can answer questions about this {len(logic)}-gate circuit. Try asking: "
-                      "'What is the output?', 'How many gates?', 'Any faults?', 'How to minimize?', or 'Explain this circuit.'",
+            'answer': (f"I can answer questions about this {len(logic)}-gate circuit, "
+                       "or about digital-logic concepts (NAND universality, propagation delay, "
+                       "De Morgan, K-maps, latches vs flip-flops, race conditions, hazards, …). "
+                       "Try one of the suggestions below."),
             'confidence': 0.5,
             'details': {'circuit_size': len(gates)},
             'suggestions': [
-                'What is the output when A=1, B=0?',
-                'Are there any faults in this circuit?',
+                'What is propagation delay?',
+                'Explain NAND universality.',
+                'Difference between latch and flip-flop?',
                 'How can I minimize this circuit?',
-                'Explain this circuit.',
-                'What gates are used?'
+                'What gates are used?',
+                'What is the output when A=1, B=0?',
             ]
         }

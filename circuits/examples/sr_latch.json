@@ -1,0 +1,92 @@
+{
+  "name": "sr_latch",
+  "gates": [
+    {
+      "id": "g1",
+      "label": "S",
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 80
+    },
+    {
+      "id": "g2",
+      "label": "R",
+      "type": "INPUT",
+      "value": 0,
+      "x": 80,
+      "y": 240
+    },
+    {
+      "id": "g3",
+      "type": "NOR",
+      "x": 280,
+      "y": 80
+    },
+    {
+      "id": "g4",
+      "type": "NOR",
+      "x": 280,
+      "y": 240
+    },
+    {
+      "id": "g5",
+      "label": "Q_bar",
+      "type": "OUTPUT",
+      "x": 480,
+      "y": 80
+    },
+    {
+      "id": "g6",
+      "label": "Q",
+      "type": "OUTPUT",
+      "x": 480,
+      "y": 240
+    }
+  ],
+  "wires": [
+    {
+      "from_gate": "g1",
+      "from_pin": 0,
+      "id": "w1",
+      "to_gate": "g3",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w2",
+      "to_gate": "g3",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g2",
+      "from_pin": 0,
+      "id": "w3",
+      "to_gate": "g4",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g3",
+      "from_pin": 0,
+      "id": "w4",
+      "to_gate": "g4",
+      "to_pin": 1
+    },
+    {
+      "from_gate": "g3",
+      "from_pin": 0,
+      "id": "w5",
+      "to_gate": "g5",
+      "to_pin": 0
+    },
+    {
+      "from_gate": "g4",
+      "from_pin": 0,
+      "id": "w6",
+      "to_gate": "g6",
+      "to_pin": 0
+    }
+  ],
+  "description": "Synthesized from: \"SR latch using NOR\""
+}

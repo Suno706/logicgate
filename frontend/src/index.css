@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-bg-900 text-gray-200 antialiased;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    margin: 0;
+    overflow: hidden;
+  }
+  * { box-sizing: border-box; }
+  ::-webkit-scrollbar       { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #0a0a0f; }
+  ::-webkit-scrollbar-thumb { background: #262633; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #363646; }
+}
+
+@layer components {
+  .btn {
+    @apply px-3 py-1.5 rounded-md font-medium transition-colors text-sm;
+  }
+  .btn-primary {
+    @apply bg-accent hover:bg-accent-hover text-white;
+  }
+  .btn-secondary {
+    @apply bg-bg-700 hover:bg-bg-600 text-gray-200 border border-bg-600;
+  }
+  .btn-ghost {
+    @apply hover:bg-bg-700 text-gray-400 hover:text-gray-200;
+  }
+  .card {
+    @apply bg-bg-800 border border-bg-600 rounded-lg p-4;
+  }
+  .input {
+    @apply bg-bg-700 border border-bg-600 rounded-md px-3 py-2 text-gray-100
+           focus:outline-none focus:border-accent placeholder-gray-600
+           font-mono text-sm;
+  }
+  .panel-section {
+    @apply border-b border-bg-600 px-3 py-2;
+  }
+  .label-xs {
+    @apply text-[8px] font-mono uppercase tracking-widest text-gray-600;
+  }
+}
+
+/* SVG gate animations */
+.gate-group {
+  transition: filter 0.1s ease;
+}
+.gate-group:hover {
+  filter: brightness(1.15);
+}

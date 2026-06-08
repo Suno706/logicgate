@@ -72,7 +72,9 @@ def validate_circuit(gates, wires):
         # composites
         "HA", "FA", "MUX4", "DEC24", "ADD4",
         # sequential
-        "DFF", "TFF", "JKFF", "REG4",
+        "DFF", "TFF", "JKFF", "REG4", "SRLATCH",
+        # combinational macros (single-block versions)
+        "MUX2", "DEC38", "ENC42", "CMP2",
     }
     for g in gates:
         t = g.get("type", "").upper()
@@ -133,9 +135,90 @@ def evaluate_gate(gate_type, inputs):
             r ^= i
         return int(not r)
 
+    # Composite / sequential macros: return primary (pin 0) output.
+    # Multi-pin outputs are emitted by evaluate_macro_pins() and stored
+    # under "<gate_id>:<pin>" keys for wires that target pin > 0.
+    if t in ("HA", "FA", "DFF", "JKFF", "TFF", "SRLATCH",
+             "MUX2", "MUX4", "DEC24", "DEC38", "ENC42", "CMP2", "REG4"):
+        return evaluate_macro_pins(t, inputs)[0]
+
     # Unknown gate type  -  default to 0
     print(f"Warning: unknown gate type '{gate_type}', defaulting output to 0")
     return 0
+
+
+def evaluate_macro_pins(t, inputs):
+    """
+    Returns the list of per-pin output values for macro components.
+    Flip-flops are evaluated *combinationally* (next-state) because the
+    simulator is a one-shot evaluator without persistent state — Q reflects
+    what the FF would latch on the next clock edge.
+    """
+    pad = lambda i: 1 if i < len(inputs) and inputs[i] else 0
+    if t == "HA":
+        a, b = pad(0), pad(1)
+        return [a ^ b, a & b]                                   # S, C
+    if t == "FA":
+        a, b, ci = pad(0), pad(1), pad(2)
+        s  = a ^ b ^ ci
+        co = (a & b) | (b & ci) | (a & ci)
+        return [s, co]                                          # S, Co
+    if t == "DFF":
+        d = pad(0)                                              # next Q = D
+        return [d, 1 - d]                                       # Q, Q̅
+    if t == "JKFF":
+        j, k = pad(0), pad(1)
+        # Stateless approximation: assume previous Q = 0. The JK truth table:
+        #   J K | Q(next)
+        #   0 0 |  Q       hold  (0 here)
+        #   0 1 |  0       reset
+        #   1 0 |  1       set
+        #   1 1 |  Q̅       toggle (1 here, since 0 → NOT 0)
+        # Collapses to Q(next) = J under the old_Q = 0 assumption.
+        return [j, 1 - j]                                       # Q, Q̅
+    if t == "TFF":
+        t_in = pad(0)
+        return [t_in, 1 - t_in]                                 # toggle from 0
+    if t == "SRLATCH":
+        s, r = pad(0), pad(1)
+        if s and not r: q = 1
+        elif r and not s: q = 0
+        elif s and r:    q = 0   # invalid — convention
+        else:            q = 0   # hold (stateless: assume 0)
+        return [q, 1 - q]                                       # Q, Q̅
+
+    if t == "MUX2":
+        a, b, s = pad(0), pad(1), pad(2)
+        return [b if s else a]                                  # Y
+    if t == "MUX4":
+        d = [pad(0), pad(1), pad(2), pad(3)]
+        s0, s1 = pad(4), pad(5)
+        sel = (s1 << 1) | s0
+        return [d[sel]]                                         # Y
+    if t == "DEC24":
+        a, b = pad(0), pad(1)
+        sel = (a << 1) | b
+        return [1 if i == sel else 0 for i in range(4)]         # Y0..Y3
+    if t == "DEC38":
+        a, b, c = pad(0), pad(1), pad(2)
+        sel = (a << 2) | (b << 1) | c
+        return [1 if i == sel else 0 for i in range(8)]         # Y0..Y7
+    if t == "ENC42":
+        # 4-to-2 priority encoder; I3 highest priority.
+        i0, i1, i2, i3 = pad(0), pad(1), pad(2), pad(3)
+        if   i3: y1, y0 = 1, 1
+        elif i2: y1, y0 = 1, 0
+        elif i1: y1, y0 = 0, 1
+        else:    y1, y0 = 0, 0
+        return [y0, y1]                                         # Y0, Y1
+    if t == "CMP2":
+        a0, a1, b0, b1 = pad(0), pad(1), pad(2), pad(3)
+        return [1 if (a0 == b0 and a1 == b1) else 0]            # EQ
+    if t == "REG4":
+        # 4-bit register: 4 D-FFs sharing CLK. Stateless next-state: Q = D.
+        # CLK (pad(4)) is not read in the combinational approximation.
+        return [pad(0), pad(1), pad(2), pad(3)]                 # Q0..Q3
+    return [0]
 
 
 def topological_sort(gates, wires):
@@ -201,25 +284,26 @@ def simulate_circuit(gates, wires):
     input_map = defaultdict(dict)
 
     for w in wires:
-        src     = w.get("from_gate") or w.get("fg")
-        dst     = w.get("to_gate")   or w.get("tg")
-        pin_raw = w.get("to_pin")    if "to_pin" in w else w.get("tp")
+        src      = w.get("from_gate") or w.get("fg")
+        dst      = w.get("to_gate")   or w.get("tg")
+        pin_raw  = w.get("to_pin")    if "to_pin"   in w else w.get("tp")
+        fpin_raw = w.get("from_pin")  if "from_pin" in w else w.get("fp")
 
-        if pin_raw is None:
-            pin_raw = 0
-        try:
-            pin_idx = int(pin_raw)
-        except (ValueError, TypeError):
-            pin_idx = 0
+        if pin_raw is None:  pin_raw = 0
+        if fpin_raw is None: fpin_raw = 0
+        try:    pin_idx  = int(pin_raw)
+        except (ValueError, TypeError): pin_idx  = 0
+        try:    from_pin = int(fpin_raw)
+        except (ValueError, TypeError): from_pin = 0
 
         if src and dst:
-            # -- Bug 4 fix: warn on duplicate wire to same pin ---------------
             if pin_idx in input_map[dst]:
                 print(
                     f"Warning: pin {pin_idx} of gate '{dst}' already has a driver "
                     f"('{input_map[dst][pin_idx]}'). Overwriting with '{src}'."
                 )
-            input_map[dst][pin_idx] = src
+            # Store (src_id, from_pin) so multi-output gates route correctly
+            input_map[dst][pin_idx] = (src, from_pin)
 
     order = topological_sort(gates, wires)
 
@@ -245,6 +329,8 @@ def simulate_circuit(gates, wires):
         # composite + sequential  -  accepted here but evaluated client-side
         "HA":     2, "FA":   3, "MUX4":  6, "DEC24": 2, "ADD4": 9,
         "DFF":    2, "TFF":  2, "JKFF":  3, "REG4":  5,
+        "SRLATCH":2,
+        "MUX2":   3, "DEC38": 3, "ENC42": 4, "CMP2":  4,
     }
 
     for gid in order:
@@ -269,11 +355,26 @@ def simulate_circuit(gates, wires):
             num_inputs = (max(pins.keys()) + 1) if pins else 0
 
         # -- Bug 3 fix: normalize inputs to strict binary ---------------------
-        inputs = [
-            1 if values.get(pins.get(p), 0) else 0
-            for p in range(num_inputs)
-        ]
+        def _read(p):
+            entry = pins.get(p)
+            if entry is None:
+                return 0
+            src_id, src_pin = entry
+            # Multi-output gates store per-pin values under "id:pin"; fall back
+            # to the primary "id" key for single-output gates.
+            v = values.get(f"{src_id}:{src_pin}")
+            if v is None:
+                v = values.get(src_id, 0)
+            return 1 if v else 0
+        inputs = [_read(p) for p in range(num_inputs)]
 
-        values[gid] = evaluate_gate(t, inputs)
+        if t in ("HA", "FA", "DFF", "JKFF", "TFF", "SRLATCH",
+                 "MUX2", "MUX4", "DEC24", "DEC38", "ENC42", "CMP2", "REG4"):
+            pins = evaluate_macro_pins(t, inputs)
+            values[gid] = pins[0]
+            for pi, pv in enumerate(pins):
+                values[f"{gid}:{pi}"] = pv
+        else:
+            values[gid] = evaluate_gate(t, inputs)
 
     return values

@@ -1,0 +1,46 @@
+# Auto-deploy LogicGate to Fly.io on every push to main.
+#
+# REQUIREMENTS (one-time setup):
+#   1. Create a Fly.io app:
+#        fly launch --no-deploy --copy-config
+#      Pick a unique app name (e.g. logicgate-sunny). This updates fly.toml.
+#
+#   2. Create the persistent volume:
+#        fly volumes create logicgate_data --size 1 --region iad
+#
+#   3. Set the session secret:
+#        fly secrets set FLASK_SECRET_KEY=$(openssl rand -hex 32)
+#
+#   4. Generate a deploy token for GitHub Actions:
+#        fly tokens create deploy --expiry 0   # never expires
+#
+#   5. Add the token to your repo's secrets:
+#        GitHub → Settings → Secrets and variables → Actions → New repository secret
+#        Name:  FLY_API_TOKEN
+#        Value: (paste the FlyV1 ... token from step 4)
+#
+# After this is done, every `git push origin main` will redeploy
+# automatically in ~90 seconds. Watch the Actions tab on GitHub for progress.
+
+name: Deploy to Fly.io
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:    # also lets you trigger manually from the Actions tab
+
+jobs:
+  deploy:
+    name: Deploy app
+    runs-on: ubuntu-latest
+    concurrency: deploy-group       # only one deploy at a time
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

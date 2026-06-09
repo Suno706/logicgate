@@ -20,7 +20,7 @@ WORKDIR /app
 
 # Python dependencies (cached layer)
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+RUN pip install --no-cache-dir -r requirements.txt
 
 # App source (excluding node_modules / __pycache__ etc — see .dockerignore)
 COPY . .
@@ -33,8 +33,6 @@ RUN mkdir -p circuits
 
 EXPOSE 5000
 
-# Eventlet-backed gunicorn so Flask-SocketIO's WebSockets work properly.
-# Single worker — Flask-SocketIO uses an in-process roster for presence/rooms.
-# 180 s timeout absorbs the first-request model training if pickles are missing.
-RUN pip install --no-cache-dir eventlet
-CMD ["sh", "-c", "gunicorn -k eventlet -w 1 --timeout 180 -b 0.0.0.0:${PORT} app:app"]
+# Use Flask-SocketIO's built-in server (threading async mode is configured
+# in realtime.py). Avoids eventlet/gevent compatibility issues on Python 3.12.
+CMD ["python", "app.py"]

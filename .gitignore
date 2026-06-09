@@ -36,10 +36,8 @@ data/*.db-wal
 data/*.db-shm
 data/user_queries.csv
 
-# Large trained models — too big for git, regenerate from CSV on first run.
-# Use Git LFS if you need to ship them, OR document re-training.
-ml_models/saved/*.pkl
-ml_models/saved/
+# Pre-trained models live in ml_models/saved/ and ship via Git LFS so the
+# deployed Space boots instantly without retraining on slow 2-vCPU hosts.
 
 # Editor / tooling caches
 .claude/

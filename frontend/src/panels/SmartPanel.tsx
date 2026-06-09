@@ -371,27 +371,8 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     if (sMode === "expr" && sExpr.trim()) {
       q2 = `build ${sExpr.trim()}`;
     } else if (sMode === "truth") {
-      // Convert truth-table bits to one SOP boolean expression per output,
-      // then combine into a multi-output build call via the API.
-      const names = "ABCDEFGH".slice(0, tInputs).split("");
-      const outExprs: { name: string; expr: string }[] = [];
-      for (let c = 0; c < tOutputs; c++) {
-        const minterms: string[] = [];
-        for (let i = 0; i < tBits.length; i++) {
-          if (tBits[i]?.[c] !== 1) continue;
-          const terms = names.map((n, idx) => {
-            const bit = (i >> (tInputs - 1 - idx)) & 1;
-            return bit ? n : "~" + n;
-          });
-          minterms.push("(" + terms.join(" & ") + ")");
-        }
-        const name = `Y${tOutputs > 1 ? c + 1 : ""}`;
-        outExprs.push({
-          name,
-          expr: minterms.length ? minterms.join(" | ") : "0",
-        });
-      }
-      const nonZero = outExprs.filter((o) => o.expr !== "0");
+      const outExprs = truthTableSOPs();
+      const nonZero  = outExprs.filter((o) => o.expr !== "0");
       if (!nonZero.length) {
         setErr("Truth table has no 1-outputs — nothing to build.");
         return;
@@ -399,8 +380,8 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
       if (tOutputs === 1) {
         q2 = `build ${outExprs[0].expr}`;
       } else {
-        // Multi-output: send as "Y1 = expr1 ; Y2 = expr2 ; ..." — the boolean
-        // parser supports the multi-output syntax already.
+        // Multi-output: send as "Y1 = expr1 ; Y2 = expr2 ; ..." — backend
+        // parses this and routes to _build_multi_output.
         q2 = "build " + outExprs.map((o) => `${o.name} = ${o.expr}`).join(" ; ");
       }
     } else {
@@ -424,6 +405,27 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     setTBits((prev) => prev.map((r, i) =>
       i === row ? r.map((b, j) => (j === col ? ((b ^ 1) as 0 | 1) : b)) : r
     ));
+  }
+  // Derive SOP expression per output for live preview AND for the build call.
+  function truthTableSOPs(): { name: string; expr: string }[] {
+    const names = "ABCDEFGH".slice(0, tInputs).split("");
+    const out: { name: string; expr: string }[] = [];
+    for (let c = 0; c < tOutputs; c++) {
+      const minterms: string[] = [];
+      for (let i = 0; i < tBits.length; i++) {
+        if (tBits[i]?.[c] !== 1) continue;
+        const terms = names.map((n, idx) => {
+          const bit = (i >> (tInputs - 1 - idx)) & 1;
+          return bit ? n : "~" + n;
+        });
+        minterms.push("(" + terms.join(" & ") + ")");
+      }
+      out.push({
+        name: tOutputs > 1 ? `Y${c + 1}` : "Y",
+        expr: minterms.length ? minterms.join(" | ") : "0",
+      });
+    }
+    return out;
   }
 
   function toggleGate(g: string) {
@@ -564,6 +566,32 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
                   ⚠ {1 << tInputs} rows — scroll the table. Synthesis may take a few seconds.
                 </div>
               )}
+              {/* Live SOP preview — one expression per output, updates as bits
+                  are toggled. Lets the user verify what will be built before
+                  clicking "Build from form". */}
+              {(() => {
+                const sops = truthTableSOPs();
+                const anyNonZero = sops.some((s) => s.expr !== "0");
+                return (
+                  <div className="bg-bg-800 border border-bg-600 rounded p-2 space-y-1">
+                    <div className="text-[8px] font-mono uppercase tracking-widest text-gray-500">
+                      Boolean (SOP) per output — live preview
+                    </div>
+                    {!anyNonZero && (
+                      <div className="text-[9px] font-mono text-gray-600 italic">
+                        toggle some Y bits to 1 to see expressions
+                      </div>
+                    )}
+                    {sops.map((s) => (
+                      <div key={s.name} className="text-[9px] font-mono break-all">
+                        <span className="text-accent">{s.name}</span>
+                        <span className="text-gray-600"> = </span>
+                        <span className="text-gray-200">{s.expr}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               <div className="bg-bg-800 border border-bg-600 rounded p-1.5 max-h-56 overflow-y-auto">
                 <table className="w-full text-[9px] font-mono">
                   <thead className="sticky top-0 bg-bg-800">

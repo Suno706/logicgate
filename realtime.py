@@ -132,6 +132,21 @@ def init_socketio(app, cors_allowed_origins="*") -> SocketIO:
             leave_room(prev, namespace="/collab")
             _broadcast_presence(prev)
 
+        # Enforce room user cap (looks up room metadata if it's a shared room).
+        # "default" and "session"-style rooms (sid-only) bypass the check.
+        if room.startswith("room_"):
+            code = room[5:].upper()
+            try:
+                import db
+                cap = db.get_room_max_users(code)
+                current = len(_rosters[room])
+                if current >= cap:
+                    emit("error", {"message": f"Room {code} is full ({cap} users max)."})
+                    emit("room_full", {"room": code, "max_users": cap})
+                    return
+            except Exception:
+                pass  # if db isn't reachable, allow join
+
         join_room(room, namespace="/collab")
         _sid_room[sid] = room
         # Don't duplicate if reconnecting

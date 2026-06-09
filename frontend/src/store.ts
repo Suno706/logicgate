@@ -264,15 +264,31 @@ export function useCircuitReducer(): [CircuitState, Dispatch<Action>] {
   const [state, baseDispatch] = useReducer(reducer, initialState);
   const dispatchRef = useRef(baseDispatch);
   dispatchRef.current = baseDispatch;
+  // Track the previous circuit so we can broadcast set_circuit when a peer-
+  // affecting action that doesn't map cleanly to a single op was dispatched.
+  const pendingFullSync = useRef(false);
 
   const dispatch: Dispatch<Action> = useCallback((action) => {
     baseDispatch(action);
-    // Broadcast user-driven mutations to peers in the same collab room.
-    // Selection / undo / sim-output changes stay local — they're not part of
-    // the shared circuit state.
     const op = _actionToRemoteOp(action);
-    if (op) collab.broadcast(op);
+    if (op) {
+      collab.broadcast(op);
+    } else if (_isPeerAffecting(action)) {
+      // Complex action (REMOVE_SELECTED, MOVE_SELECTED, RENAME_GATE etc.) —
+      // can't be expressed as a single op without knowing state. Mark pending
+      // and the effect below will broadcast the resulting circuit.
+      pendingFullSync.current = true;
+    }
   }, []);
+
+  // After a complex action lands in state, broadcast the new circuit so peers
+  // converge. Avoids selection-state divergence problems.
+  useEffect(() => {
+    if (pendingFullSync.current) {
+      pendingFullSync.current = false;
+      collab.broadcast({ kind: "set_circuit", payload: { circuit: state.circuit } });
+    }
+  }, [state.circuit]);
 
   // Listen for remote ops and apply them locally (without rebroadcasting).
   useEffect(() => {
@@ -284,6 +300,14 @@ export function useCircuitReducer(): [CircuitState, Dispatch<Action>] {
   }, []);
 
   return [state, dispatch];
+}
+
+function _isPeerAffecting(a: Action): boolean {
+  return (
+    a.type === "REMOVE_SELECTED" ||
+    a.type === "MOVE_SELECTED" ||
+    a.type === "RENAME_GATE"
+  );
 }
 
 function _actionToRemoteOp(a: Action): RemoteOp | null {

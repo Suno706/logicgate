@@ -295,7 +295,33 @@ def room_info(code):
             return jsonify({'exists': False, 'code': code})
         owner = db.get_room_owner(code)
         is_owner = bool(owner) and owner == _session_id()
-        return jsonify({'exists': True, 'is_owner': is_owner, **info})
+        max_users = db.get_room_max_users(code)
+        return jsonify({'exists': True, 'is_owner': is_owner,
+                        'max_users': max_users, **info})
+    except Exception as e:
+        return _err(e, exc=e)
+
+
+@app.route('/api/rooms/<code>/config', methods=['POST'])
+def room_config(code):
+    """Owner-only: update room settings.
+    Body: {max_users: int}"""
+    try:
+        code = ''.join(c for c in code.upper() if c.isalnum())[:12]
+        data = request.get_json(silent=True) or {}
+        max_users = data.get('max_users')
+        if max_users is None:
+            return _err('Missing max_users', 400)
+        try:
+            max_users = int(max_users)
+        except (TypeError, ValueError):
+            return _err('max_users must be an integer', 400)
+        if max_users < 2 or max_users > 100:
+            return _err('max_users must be between 2 and 100', 400)
+        ok = db.set_room_max_users(code, _session_id(), max_users)
+        if not ok:
+            return _err('Only the room owner can change settings.', 403)
+        return jsonify({'success': True, 'max_users': max_users})
     except Exception as e:
         return _err(e, exc=e)
 

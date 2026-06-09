@@ -82,11 +82,15 @@ def _init_schema(conn: sqlite3.Connection):
             code          TEXT PRIMARY KEY,
             created_by    TEXT,
             created_at    REAL NOT NULL,
-            last_used_at  REAL NOT NULL
+            last_used_at  REAL NOT NULL,
+            max_users     INTEGER DEFAULT 20
         );
     """)
-    # SQLite type affinity is lenient — if an older DB had created_by as
-    # INTEGER, we can still write TEXT values into it. No migration needed.
+    # Add max_users column if upgrading from an older schema.
+    try:
+        conn.execute("ALTER TABLE rooms ADD COLUMN max_users INTEGER DEFAULT 20")
+    except Exception:
+        pass  # already exists
     conn.commit()
 
 
@@ -208,10 +212,11 @@ _ROOM_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 import secrets   # noqa: E402
 
 
-def generate_room_code(length: int = 6, owner_session: str = None) -> str:
+def generate_room_code(length: int = 6, owner_session: str = None,
+                       max_users: int = 20) -> str:
     """Generate a unique room code. owner_session: caller's session_id, stored
     as text so guests (s_xxx) AND signed-in users (u_xxx_yyy / g_xxx) can own
-    a room and kick others."""
+    a room and kick others. max_users caps concurrent connections (default 20)."""
     for _ in range(20):
         code = "".join(secrets.choice(_ROOM_ALPHABET) for _ in range(length))
         with cursor() as cur:
@@ -220,9 +225,9 @@ def generate_room_code(length: int = 6, owner_session: str = None) -> str:
             ).fetchone()
             if not exists:
                 cur.execute(
-                    "INSERT INTO rooms (code, created_by, created_at, last_used_at) "
-                    "VALUES (?, ?, ?, ?)",
-                    (code, owner_session, time.time(), time.time()),
+                    "INSERT INTO rooms (code, created_by, created_at, last_used_at, max_users) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (code, owner_session, time.time(), time.time(), max_users),
                 )
                 return code
     raise RuntimeError("Could not generate unique room code")
@@ -235,6 +240,35 @@ def get_room_owner(code: str) -> Optional[str]:
             "SELECT created_by FROM rooms WHERE code = ?", (code,)
         ).fetchone()
         return row["created_by"] if row else None
+
+
+def get_room_max_users(code: str) -> int:
+    """Returns the cap on concurrent users. Defaults to 20."""
+    with cursor() as cur:
+        row = cur.execute(
+            "SELECT max_users FROM rooms WHERE code = ?", (code,)
+        ).fetchone()
+        if row and row["max_users"] is not None:
+            try:
+                return int(row["max_users"])
+            except (TypeError, ValueError):
+                pass
+        return 20
+
+
+def set_room_max_users(code: str, owner_session: str, max_users: int) -> bool:
+    """Owner-only: update max_users for a room. Returns True if the caller owns
+    the room and the update happened."""
+    max_users = max(2, min(100, int(max_users)))
+    with cursor() as cur:
+        row = cur.execute(
+            "SELECT created_by FROM rooms WHERE code = ?", (code,)
+        ).fetchone()
+        if not row or row["created_by"] != owner_session:
+            return False
+        cur.execute("UPDATE rooms SET max_users = ? WHERE code = ?",
+                    (max_users, code))
+        return True
 
 
 def touch_room(code: str) -> bool:

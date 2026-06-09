@@ -262,9 +262,14 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
   const [showStruct, setShowStruct] = useState(false);
 
   // Structured-input fallback state
+  type Mode = "template" | "expr" | "truth";
+  const [sMode,     setSMode]     = useState<Mode>("template");
   const [sTemplate, setSTemplate] = useState<string>("half adder");
   const [sExpr,     setSExpr]     = useState<string>("");
   const [sGates,    setSGates]    = useState<string[]>([]);  // empty = mixed
+  // Truth-table state
+  const [tInputs,   setTInputs]   = useState<number>(2);
+  const [tBits,     setTBits]     = useState<(0 | 1)[]>([0, 0, 0, 1]); // default = AND
 
   const TEMPLATES = [
     "half adder", "full adder", "full adder using half adder",
@@ -288,19 +293,35 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
         setShowStruct(false);
       } else if (r.answer) {
         setErr(r.answer);
+        // Pop the structured form so the user has a no-NL way out.
+        setShowStruct(true);
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
+      setShowStruct(true);
     } finally { setL(false); }
   }
 
   function buildFromStruct() {
     let q2 = "";
-    if (sExpr.trim()) {
-      // Boolean expression mode
+    if (sMode === "expr" && sExpr.trim()) {
       q2 = `build ${sExpr.trim()}`;
+    } else if (sMode === "truth") {
+      // Convert truth-table bits to an SOP boolean expression that the
+      // backend's boolean parser already understands.
+      const names = "ABCDEFGH".slice(0, tInputs).split("");
+      const minterms: string[] = [];
+      for (let i = 0; i < tBits.length; i++) {
+        if (tBits[i] !== 1) continue;
+        const terms = names.map((n, idx) => {
+          const bit = (i >> (tInputs - 1 - idx)) & 1;
+          return bit ? n : "~" + n;
+        });
+        minterms.push("(" + terms.join(" & ") + ")");
+      }
+      if (!minterms.length) { setErr("Truth table has no 1-outputs — nothing to build."); return; }
+      q2 = `build ${minterms.join(" | ")}`;
     } else {
-      // Template mode
       q2 = `build ${sTemplate}`;
     }
     if (sGates.length > 0) {
@@ -308,6 +329,14 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     }
     setQ(q2);
     build(q2);
+  }
+
+  function resizeTruthTable(n: number) {
+    setTInputs(n);
+    setTBits(Array(1 << n).fill(0) as (0 | 1)[]);
+  }
+  function toggleBit(i: number) {
+    setTBits((prev) => prev.map((b, idx) => (idx === i ? ((b ^ 1) as 0 | 1) : b)));
   }
 
   function toggleGate(g: string) {
@@ -342,36 +371,107 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
       {showStruct && (
         <div className="bg-bg-700/40 border border-bg-600 rounded p-2.5 space-y-2.5">
           <div className="text-[8px] font-mono uppercase tracking-widest text-gray-500">
-            Structured build — pick a template OR enter a boolean expression
+            Structured build — no NL needed
           </div>
 
-          <div>
-            <label className="text-[9px] font-mono text-gray-500 block mb-1">Template</label>
-            <select
-              value={sTemplate}
-              onChange={(e) => { setSTemplate(e.target.value); setSExpr(""); }}
-              className="w-full bg-bg-800 border border-bg-600 rounded px-2 py-1 text-[10px] font-mono text-gray-200 focus:outline-none focus:border-accent"
-            >
-              {TEMPLATES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+          {/* Mode tabs */}
+          <div className="flex gap-1 text-[9px] font-mono">
+            {(["template", "expr", "truth"] as Mode[]).map((m) => (
+              <button key={m} onClick={() => setSMode(m)}
+                className={`flex-1 py-1 rounded border transition-all ${
+                  sMode === m
+                    ? "bg-accent/25 border-accent text-accent"
+                    : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500"
+                }`}
+              >
+                {m === "template" ? "Template" : m === "expr" ? "Boolean" : "Truth Table"}
+              </button>
+            ))}
           </div>
 
+          {sMode === "template" && (
+            <div>
+              <label className="text-[9px] font-mono text-gray-500 block mb-1">Pick a circuit</label>
+              <select
+                value={sTemplate}
+                onChange={(e) => setSTemplate(e.target.value)}
+                className="w-full bg-bg-800 border border-bg-600 rounded px-2 py-1 text-[10px] font-mono text-gray-200 focus:outline-none focus:border-accent"
+              >
+                {TEMPLATES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          )}
+
+          {sMode === "expr" && (
+            <div>
+              <label className="text-[9px] font-mono text-gray-500 block mb-1">
+                Boolean expression
+              </label>
+              <input
+                type="text"
+                value={sExpr}
+                onChange={(e) => setSExpr(e.target.value)}
+                placeholder="e.g. (A&B) | (~A&C) | (B^C)"
+                className="w-full bg-bg-800 border border-bg-600 rounded px-2 py-1 text-[10px] font-mono text-gray-200 focus:outline-none focus:border-accent placeholder-gray-700"
+              />
+              <div className="text-[8px] font-mono text-gray-600 mt-1">
+                Operators: <code>&amp;</code> = AND, <code>|</code> = OR, <code>~</code> = NOT, <code>^</code> = XOR
+              </div>
+            </div>
+          )}
+
+          {sMode === "truth" && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-[9px] font-mono text-gray-500">
+                <span>Inputs:</span>
+                {[2, 3, 4].map((n) => (
+                  <button key={n} onClick={() => resizeTruthTable(n)}
+                    className={`px-2 py-0.5 rounded border ${
+                      tInputs === n
+                        ? "bg-accent/25 border-accent text-accent"
+                        : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500"
+                    }`}
+                  >{n}</button>
+                ))}
+                <span className="ml-auto">Click Y to toggle</span>
+              </div>
+              <div className="bg-bg-800 border border-bg-600 rounded p-1.5 max-h-44 overflow-y-auto">
+                <table className="w-full text-[9px] font-mono">
+                  <thead>
+                    <tr className="text-gray-600">
+                      {"ABCDEFGH".slice(0, tInputs).split("").map((n) => (
+                        <th key={n} className="px-1 text-center">{n}</th>
+                      ))}
+                      <th className="px-1 text-center text-accent">Y</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tBits.map((b, i) => (
+                      <tr key={i} className="hover:bg-bg-700/40">
+                        {Array.from({length: tInputs}).map((_, k) => (
+                          <td key={k} className="px-1 text-center text-gray-500">
+                            {(i >> (tInputs - 1 - k)) & 1}
+                          </td>
+                        ))}
+                        <td className="px-1 text-center">
+                          <button onClick={() => toggleBit(i)}
+                            className={`w-5 h-4 rounded font-bold ${
+                              b ? "bg-accent/25 text-accent" : "bg-bg-700 text-gray-600 hover:text-gray-300"
+                            }`}
+                          >{b}</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Always-visible gate restriction */}
           <div>
             <label className="text-[9px] font-mono text-gray-500 block mb-1">
-              ...OR boolean expression (overrides template)
-            </label>
-            <input
-              type="text"
-              value={sExpr}
-              onChange={(e) => setSExpr(e.target.value)}
-              placeholder="e.g. (A&B) | (~A&C) | (B^C)"
-              className="w-full bg-bg-800 border border-bg-600 rounded px-2 py-1 text-[10px] font-mono text-gray-200 focus:outline-none focus:border-accent placeholder-gray-700"
-            />
-          </div>
-
-          <div>
-            <label className="text-[9px] font-mono text-gray-500 block mb-1">
-              Restrict gates to (optional — leave empty for any)
+              Restrict to gates (optional)
             </label>
             <div className="flex flex-wrap gap-1">
               {GATE_OPTIONS.map((g) => (
@@ -388,6 +488,10 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
                 </button>
               ))}
             </div>
+            {sGates.length > 0 && (
+              <button onClick={() => setSGates([])}
+                className="text-[8px] text-gray-600 hover:text-accent mt-1">clear</button>
+            )}
           </div>
 
           <button

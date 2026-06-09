@@ -49,13 +49,8 @@ class GateMinimizer:
         X_test_s    = self.scaler.transform(X_test)
 
         print("[GateMinimizer] Training Random Forest ...")
-        # Capped to stay well under 512 MB RAM on free-tier hosts.
-        # Defaults (100 trees, unlimited depth) produced a 551 MB pickle.
-        self.model = RandomForestClassifier(
-            n_estimators=40,
-            max_depth=18,
-            n_jobs=1,
-            random_state=42,
+        self.model = RandomForestClassifier(n_jobs=-1,
+            random_state=42
         )
         self.model.fit(X_train_s, y_train)
 

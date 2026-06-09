@@ -1007,6 +1007,88 @@ def _raw_template_t_flipflop():
     }
 
 
+def _raw_template_full_adder_from_half():
+    """Full adder built compositionally from two half-adders + OR:
+       HA1(A,B) -> (S1, C1);  HA2(S1, Cin) -> (Sum, C2);  Cout = C1 | C2"""
+    return {
+        'gates': [
+            {'id': 'g1', 'type': 'INPUT',  'label': 'A',   'value': 0, 'x':  80, 'y':  60},
+            {'id': 'g2', 'type': 'INPUT',  'label': 'B',   'value': 0, 'x':  80, 'y': 160},
+            {'id': 'g3', 'type': 'INPUT',  'label': 'Cin', 'value': 0, 'x':  80, 'y': 300},
+            # HA1
+            {'id': 'g4', 'type': 'XOR',                                'x': 260, 'y': 100},  # S1
+            {'id': 'g5', 'type': 'AND',                                'x': 260, 'y': 220},  # C1
+            # HA2
+            {'id': 'g6', 'type': 'XOR',                                'x': 460, 'y': 200},  # Sum
+            {'id': 'g7', 'type': 'AND',                                'x': 460, 'y': 320},  # C2
+            # carry combine
+            {'id': 'g8', 'type': 'OR',                                 'x': 660, 'y': 280},  # Cout
+            {'id': 'g9', 'type': 'OUTPUT','label': 'Sum',              'x': 860, 'y': 200},
+            {'id': 'g10','type': 'OUTPUT','label': 'Cout',             'x': 860, 'y': 280},
+        ],
+        'wires': [
+            {'id': 'w1',  'from_gate': 'g1', 'from_pin': 0, 'to_gate': 'g4', 'to_pin': 0},  # A -> XOR1
+            {'id': 'w2',  'from_gate': 'g2', 'from_pin': 0, 'to_gate': 'g4', 'to_pin': 1},  # B -> XOR1
+            {'id': 'w3',  'from_gate': 'g1', 'from_pin': 0, 'to_gate': 'g5', 'to_pin': 0},  # A -> AND1
+            {'id': 'w4',  'from_gate': 'g2', 'from_pin': 0, 'to_gate': 'g5', 'to_pin': 1},  # B -> AND1
+            {'id': 'w5',  'from_gate': 'g4', 'from_pin': 0, 'to_gate': 'g6', 'to_pin': 0},  # S1 -> XOR2
+            {'id': 'w6',  'from_gate': 'g3', 'from_pin': 0, 'to_gate': 'g6', 'to_pin': 1},  # Cin -> XOR2
+            {'id': 'w7',  'from_gate': 'g4', 'from_pin': 0, 'to_gate': 'g7', 'to_pin': 0},  # S1 -> AND2
+            {'id': 'w8',  'from_gate': 'g3', 'from_pin': 0, 'to_gate': 'g7', 'to_pin': 1},  # Cin -> AND2
+            {'id': 'w9',  'from_gate': 'g5', 'from_pin': 0, 'to_gate': 'g8', 'to_pin': 0},  # C1 -> OR
+            {'id': 'w10', 'from_gate': 'g7', 'from_pin': 0, 'to_gate': 'g8', 'to_pin': 1},  # C2 -> OR
+            {'id': 'w11', 'from_gate': 'g6', 'from_pin': 0, 'to_gate': 'g9', 'to_pin': 0},  # Sum out
+            {'id': 'w12', 'from_gate': 'g8', 'from_pin': 0, 'to_gate': 'g10','to_pin': 0},  # Cout
+        ],
+    }
+
+
+def _raw_template_4to1_mux():
+    """4-to-1 multiplexer with 4 data inputs (D0-D3) and 2 select lines (S0,S1)."""
+    return {
+        'gates': [
+            {'id': 'g1', 'type': 'INPUT', 'label': 'D0', 'value': 0, 'x':  80, 'y':  40},
+            {'id': 'g2', 'type': 'INPUT', 'label': 'D1', 'value': 0, 'x':  80, 'y': 110},
+            {'id': 'g3', 'type': 'INPUT', 'label': 'D2', 'value': 0, 'x':  80, 'y': 180},
+            {'id': 'g4', 'type': 'INPUT', 'label': 'D3', 'value': 0, 'x':  80, 'y': 250},
+            {'id': 'g5', 'type': 'INPUT', 'label': 'S0', 'value': 0, 'x':  80, 'y': 330},
+            {'id': 'g6', 'type': 'INPUT', 'label': 'S1', 'value': 0, 'x':  80, 'y': 400},
+            {'id': 'n1', 'type': 'NOT',                              'x': 220, 'y': 330},  # ~S0
+            {'id': 'n2', 'type': 'NOT',                              'x': 220, 'y': 400},  # ~S1
+            {'id': 'a1', 'type': 'AND',                              'x': 380, 'y':  40},  # D0 & ~S0 & ~S1
+            {'id': 'a2', 'type': 'AND',                              'x': 380, 'y': 110},  # D1 &  S0 & ~S1
+            {'id': 'a3', 'type': 'AND',                              'x': 380, 'y': 180},  # D2 & ~S0 &  S1
+            {'id': 'a4', 'type': 'AND',                              'x': 380, 'y': 250},  # D3 &  S0 &  S1
+            {'id': 'o1', 'type': 'OR',                               'x': 580, 'y': 140},
+            {'id': 'o2', 'type': 'OR',                               'x': 580, 'y': 220},
+            {'id': 'o3', 'type': 'OR',                               'x': 760, 'y': 180},
+            {'id': 'gO', 'type': 'OUTPUT','label': 'Y',              'x': 940, 'y': 180},
+        ],
+        'wires': [
+            {'id':'w1','from_gate':'g5','from_pin':0,'to_gate':'n1','to_pin':0},
+            {'id':'w2','from_gate':'g6','from_pin':0,'to_gate':'n2','to_pin':0},
+            # AND fan-in is 2, so each AND only takes Dx & one select-product.
+            # Build select products externally is heavier — use 3-input collapse
+            # by stacking ANDs in pairs.
+            {'id':'w3','from_gate':'g1','from_pin':0,'to_gate':'a1','to_pin':0},
+            {'id':'w4','from_gate':'n1','from_pin':0,'to_gate':'a1','to_pin':1},
+            {'id':'w5','from_gate':'g2','from_pin':0,'to_gate':'a2','to_pin':0},
+            {'id':'w6','from_gate':'g5','from_pin':0,'to_gate':'a2','to_pin':1},
+            {'id':'w7','from_gate':'g3','from_pin':0,'to_gate':'a3','to_pin':0},
+            {'id':'w8','from_gate':'g6','from_pin':0,'to_gate':'a3','to_pin':1},
+            {'id':'w9','from_gate':'g4','from_pin':0,'to_gate':'a4','to_pin':0},
+            {'id':'w10','from_gate':'g5','from_pin':0,'to_gate':'a4','to_pin':1},
+            {'id':'w11','from_gate':'a1','from_pin':0,'to_gate':'o1','to_pin':0},
+            {'id':'w12','from_gate':'a2','from_pin':0,'to_gate':'o1','to_pin':1},
+            {'id':'w13','from_gate':'a3','from_pin':0,'to_gate':'o2','to_pin':0},
+            {'id':'w14','from_gate':'a4','from_pin':0,'to_gate':'o2','to_pin':1},
+            {'id':'w15','from_gate':'o1','from_pin':0,'to_gate':'o3','to_pin':0},
+            {'id':'w16','from_gate':'o2','from_pin':0,'to_gate':'o3','to_pin':1},
+            {'id':'w17','from_gate':'o3','from_pin':0,'to_gate':'gO','to_pin':0},
+        ],
+    }
+
+
 RAW_TEMPLATES = {
     'sr latch':       _raw_template_sr_latch_nor,
     'sr latch nor':   _raw_template_sr_latch_nor,
@@ -1021,6 +1103,20 @@ RAW_TEMPLATES = {
     'sr flip flop':   _raw_template_jk_flipflop,   # JK is the SR-without-undefined variant
     't flip flop':    _raw_template_t_flipflop,
     'toggle flip flop': _raw_template_t_flipflop,
+    # Compositional builds (matched by RAW_TEMPLATES loop in build_from_text)
+    'full adder from half adder':      _raw_template_full_adder_from_half,
+    'full adder using half adder':     _raw_template_full_adder_from_half,
+    'full adder using half adders':    _raw_template_full_adder_from_half,
+    'full adder from half adders':     _raw_template_full_adder_from_half,
+    'full adder with half adder':      _raw_template_full_adder_from_half,
+    'full adder with half adders':     _raw_template_full_adder_from_half,
+    'full adder via half adder':       _raw_template_full_adder_from_half,
+    'fa from ha':                      _raw_template_full_adder_from_half,
+    'fa using ha':                     _raw_template_full_adder_from_half,
+    '4 to 1 mux':                      _raw_template_4to1_mux,
+    '4-to-1 mux':                      _raw_template_4to1_mux,
+    '4 to 1 multiplexer':              _raw_template_4to1_mux,
+    '4to1 mux':                        _raw_template_4to1_mux,
 }
 
 
@@ -2404,7 +2500,9 @@ class QuestionSolver:
             r'^\s*(?:please\s+|pls\s+|plz\s+|hey\s+|hi\s+|yo\s+|um\s+|so\s+)?'
             r'(?:can\s+(?:you|u)\s+|could\s+(?:you|u)\s+|i\s+(?:want|need|wanna|wish)\s+(?:to\s+)?|'
             r'i\'?d\s+like\s+(?:to\s+)?|gimme\s+|give\s+me\s+(?:an?\s+)?|'
-            r'show\s+me\s+(?:an?\s+)?|let\'?s\s+|how\s+(?:do|to|can)\s+i\s+)?'
+            r'show\s+me\s+(?:an?\s+)?|let\'?s\s+|'
+            # "how to build", "how do you make", "how can we design" — i optional
+            r'how\s+(?:do|to|can|would|should)\s+(?:i|you|u|we)?\s*)?'
             r'(?:build|make|design|create|construct|generate|draw|wire\s+up|'
             r'synthesize|synthesise|implement|assemble|sketch|put\s+together|'
             r'render|produce|set\s+up|i\s+want|i\s+need)\b'

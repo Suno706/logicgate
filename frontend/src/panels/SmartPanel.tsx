@@ -259,6 +259,22 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
   const [loading, setL]   = useState(false);
   const [error, setErr]   = useState<string | null>(null);
   const [info, setInfo]   = useState<any>(null);
+  const [showStruct, setShowStruct] = useState(false);
+
+  // Structured-input fallback state
+  const [sTemplate, setSTemplate] = useState<string>("half adder");
+  const [sExpr,     setSExpr]     = useState<string>("");
+  const [sGates,    setSGates]    = useState<string[]>([]);  // empty = mixed
+
+  const TEMPLATES = [
+    "half adder", "full adder", "full adder using half adder",
+    "2 to 1 mux", "4 to 1 mux", "majority gate",
+    "d flip flop", "sr latch", "jk flip flop", "t flip flop",
+    "decoder 2 to 4", "encoder 4 to 2",
+    "2 bit adder", "4 bit adder", "8 bit adder",
+    "2 bit comparator", "parity",
+  ];
+  const GATE_OPTIONS = ["NAND", "NOR", "AND", "OR", "NOT", "XOR", "XNOR"];
 
   async function build(question: string) {
     const q2 = question.trim();
@@ -269,12 +285,33 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
       if (r.circuit) {
         dispatch({ type: "SET_CIRCUIT", circuit: r.circuit });
         setInfo(r.info ?? null);
+        setShowStruct(false);
       } else if (r.answer) {
         setErr(r.answer);
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally { setL(false); }
+  }
+
+  function buildFromStruct() {
+    let q2 = "";
+    if (sExpr.trim()) {
+      // Boolean expression mode
+      q2 = `build ${sExpr.trim()}`;
+    } else {
+      // Template mode
+      q2 = `build ${sTemplate}`;
+    }
+    if (sGates.length > 0) {
+      q2 += ` using ${sGates.join(" and ")}`;
+    }
+    setQ(q2);
+    build(q2);
+  }
+
+  function toggleGate(g: string) {
+    setSGates((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
   }
 
   return (
@@ -294,7 +331,74 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
         >
           {loading ? "Building…" : "Build circuit →"}
         </button>
+        <button
+          onClick={() => setShowStruct((s) => !s)}
+          className="mt-1 w-full py-1 rounded bg-bg-700 hover:bg-bg-600 text-gray-400 hover:text-accent text-[10px] font-mono border border-bg-600 transition-all"
+        >
+          {showStruct ? "Hide structured form ▲" : "Can't describe it? Use structured form ▼"}
+        </button>
       </div>
+
+      {showStruct && (
+        <div className="bg-bg-700/40 border border-bg-600 rounded p-2.5 space-y-2.5">
+          <div className="text-[8px] font-mono uppercase tracking-widest text-gray-500">
+            Structured build — pick a template OR enter a boolean expression
+          </div>
+
+          <div>
+            <label className="text-[9px] font-mono text-gray-500 block mb-1">Template</label>
+            <select
+              value={sTemplate}
+              onChange={(e) => { setSTemplate(e.target.value); setSExpr(""); }}
+              className="w-full bg-bg-800 border border-bg-600 rounded px-2 py-1 text-[10px] font-mono text-gray-200 focus:outline-none focus:border-accent"
+            >
+              {TEMPLATES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[9px] font-mono text-gray-500 block mb-1">
+              ...OR boolean expression (overrides template)
+            </label>
+            <input
+              type="text"
+              value={sExpr}
+              onChange={(e) => setSExpr(e.target.value)}
+              placeholder="e.g. (A&B) | (~A&C) | (B^C)"
+              className="w-full bg-bg-800 border border-bg-600 rounded px-2 py-1 text-[10px] font-mono text-gray-200 focus:outline-none focus:border-accent placeholder-gray-700"
+            />
+          </div>
+
+          <div>
+            <label className="text-[9px] font-mono text-gray-500 block mb-1">
+              Restrict gates to (optional — leave empty for any)
+            </label>
+            <div className="flex flex-wrap gap-1">
+              {GATE_OPTIONS.map((g) => (
+                <button
+                  key={g}
+                  onClick={() => toggleGate(g)}
+                  className={`px-2 py-0.5 rounded text-[9px] font-mono border transition-all ${
+                    sGates.includes(g)
+                      ? "bg-accent/25 border-accent text-accent"
+                      : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500"
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={buildFromStruct}
+            disabled={loading}
+            className="w-full py-1.5 rounded bg-accent hover:bg-accent-hover text-white text-[10px] font-mono font-bold disabled:opacity-40"
+          >
+            Build from form →
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="bg-bg-700 border border-bg-600 rounded p-2.5 text-[10px] font-mono text-gray-400 whitespace-pre-wrap leading-relaxed">

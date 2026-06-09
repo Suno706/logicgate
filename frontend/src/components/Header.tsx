@@ -160,6 +160,12 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
     setShowRoom(false);
     setRoomInput("");
     toast.success(code ? `Joined room: ${code}` : "Switched to private session");
+    // Sync the URL ?room= param so a Leave (code === "") doesn't get
+    // auto-rejoined by the URL-auto-join effect on next reload.
+    const url = new URL(window.location.href);
+    if (code) url.searchParams.set("room", code);
+    else      url.searchParams.delete("room");
+    window.history.replaceState({}, "", url.toString());
     // Force a reload so the WebSocket reconnects with the new session id.
     setTimeout(() => window.location.reload(), 300);
   }

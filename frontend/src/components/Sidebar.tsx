@@ -80,9 +80,33 @@ const MACROS: { label: string; items: MacroEntry[] }[] = [
   },
 ];
 
-const SYNTHESIS_ONLY = [
-  { name: "4-bit Adder",     query: "4 bit ripple carry adder",   desc: "Ripple carry" },
-  { name: "BCD → 7-seg",     query: "bcd to 7 segment decoder",   desc: "Display driver" },
+const SYNTHESIS_ONLY: { name: string; query: string; desc: string }[] = [
+  // ── Arithmetic ──
+  { name: "2-bit Adder",        query: "2 bit adder",                desc: "A1A0 + B1B0" },
+  { name: "4-bit Adder",        query: "4 bit ripple carry adder",   desc: "Ripple carry" },
+  { name: "8-bit Adder",        query: "8 bit adder",                desc: "Wide ripple" },
+  { name: "Half Subtractor",    query: "half subtractor",            desc: "A - B" },
+  { name: "Full Subtractor",    query: "full subtractor",            desc: "A - B - Bin" },
+  { name: "4-bit Subtractor",   query: "4 bit subtractor",           desc: "2's complement" },
+  { name: "2-bit Comparator",   query: "2 bit comparator",           desc: "<, =, >" },
+  { name: "4-bit Comparator",   query: "4 bit comparator",           desc: "Wide compare" },
+  { name: "2-bit Multiplier",   query: "2 bit multiplier",           desc: "A × B → 4 bits" },
+  // ── Mux / Demux / Decoder / Encoder ──
+  { name: "8:1 MUX",            query: "8 to 1 mux",                 desc: "3-select MUX" },
+  { name: "1:4 DEMUX",          query: "1 to 4 demux",               desc: "Single in" },
+  { name: "1:8 DEMUX",          query: "1 to 8 demux",               desc: "3-select demux" },
+  { name: "BCD → 7-seg",        query: "bcd to 7 segment decoder",   desc: "Display driver" },
+  { name: "8:3 Encoder",        query: "8 to 3 priority encoder",    desc: "Priority encoder" },
+  { name: "Priority encoder",   query: "priority encoder valid",     desc: "With valid bit" },
+  { name: "Parity",             query: "parity",                     desc: "Even parity" },
+  { name: "Majority gate",      query: "majority gate",              desc: "3-input majority" },
+  // ── Latches & flip-flops alternates ──
+  { name: "SR Latch (NAND)",    query: "sr latch nand",              desc: "Active-low S,R" },
+  { name: "Gated D Latch",      query: "gated d latch",              desc: "Level-sensitive" },
+  { name: "Master-slave FF",    query: "master slave flip flop",     desc: "Edge-triggered D" },
+  // ── Registers / counters ──
+  { name: "4-bit Shift Reg",    query: "4 bit shift register",       desc: "Parallel-out" },
+  { name: "4-bit Counter",      query: "4 bit counter",              desc: "Mod-16 ripple" },
 ];
 
 const COLORS: Record<string, string> = {

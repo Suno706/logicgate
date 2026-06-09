@@ -1,40 +1,54 @@
 import { useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { useCircuitState } from "../store";
-import { collectOutputMap, GRAY2 } from "./boolUtils";
+import { collectOutputMap, GRAY2, inputsReachingOutput } from "./boolUtils";
 import type { Gate } from "../types";
 
 export function KmapPanel() {
   const { circuit } = useCircuitState();
-  const ins  = circuit.gates.filter((g) => g.type === "INPUT" || g.type === "CLOCK");
-  const outs = circuit.gates.filter((g) => g.type === "OUTPUT" || g.type === "LED");
+  const allIns = circuit.gates.filter((g) => g.type === "INPUT" || g.type === "CLOCK");
+  const outs   = circuit.gates.filter((g) => g.type === "OUTPUT" || g.type === "LED");
 
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
-  const [maps,    setMaps]    = useState<{ out: Gate; map: Record<number, 0 | 1> }[]>([]);
+  const [maps,    setMaps]    = useState<{ out: Gate; ins: Gate[]; map: Record<number, 0 | 1> }[]>([]);
 
   async function build() {
-    if (ins.length < 2 || ins.length > 6) {
-      setError("Karnaugh maps support 2–6 INPUTs. Beyond 6 the grid is no longer readable as a 2-D map.");
-      return;
-    }
     if (!outs.length) {
       setError("Add at least one OUTPUT gate.");
       return;
     }
     setLoading(true); setError(null);
     try {
-      const all: { out: Gate; map: Record<number, 0 | 1> }[] = [];
+      const all: { out: Gate; ins: Gate[]; map: Record<number, 0 | 1> }[] = [];
+      const warnings: string[] = [];
       for (const o of outs) {
-        const m = await collectOutputMap(circuit, ins, o);
-        all.push({ out: o, map: m });
+        // Only inputs that have a wire path to this output affect it.
+        const reachable = inputsReachingOutput(circuit, o);
+        if (reachable.length < 1) {
+          warnings.push(`"${o.label || o.id}" has no INPUTs wired to it — skipped.`);
+          continue;
+        }
+        if (reachable.length > 6) {
+          warnings.push(`"${o.label || o.id}" depends on ${reachable.length} inputs — K-maps support up to 6.`);
+          continue;
+        }
+        const m = await collectOutputMap(circuit, reachable, o);
+        all.push({ out: o, ins: reachable, map: m });
       }
       setMaps(all);
+      setError(warnings.length ? warnings.join(" • ") : null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally { setLoading(false); }
   }
 
+  // Track which INPUTs are reachable from ANY output (for the legend).
+  const reachableAcrossAll = new Set<string>();
+  for (const o of outs) {
+    for (const g of inputsReachingOutput(circuit, o)) reachableAcrossAll.add(g.id);
+  }
+  const ins = allIns;
   const inNames = ins.map((g, i) => g.label || String.fromCharCode(65 + i));
 
   return (
@@ -50,19 +64,23 @@ export function KmapPanel() {
 
       {error && <div className="text-[9px] font-mono text-err flex-shrink-0">{error}</div>}
 
-      {/* Variable legend — show on-canvas gate id → letter mapping */}
+      {/* Variable legend — show on-canvas gate id → letter mapping. Unconnected
+          inputs are dimmed so the user can see they're not used. */}
       {ins.length > 0 && (
         <div className="bg-bg-700/30 border border-bg-600 rounded p-2 flex-shrink-0">
           <div className="text-[8px] font-mono uppercase tracking-widest text-gray-600 mb-1">
-            Inputs (left → right = MSB → LSB)
+            Inputs (dimmed = not connected to any output)
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {ins.map((g, i) => (
-              <div key={g.id} className="flex items-center gap-1 text-[9px] font-mono">
-                <span className="px-1.5 py-0.5 rounded bg-accent/15 text-accent font-bold">{inNames[i]}</span>
-                <span className="text-gray-600">= {g.id}</span>
-              </div>
-            ))}
+            {ins.map((g, i) => {
+              const used = reachableAcrossAll.has(g.id);
+              return (
+                <div key={g.id} className={`flex items-center gap-1 text-[9px] font-mono ${used ? "" : "opacity-40"}`}>
+                  <span className={`px-1.5 py-0.5 rounded font-bold ${used ? "bg-accent/15 text-accent" : "bg-bg-600 text-gray-500"}`}>{inNames[i]}</span>
+                  <span className="text-gray-600">= {g.id}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -74,8 +92,10 @@ export function KmapPanel() {
       )}
 
       <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
-        {maps.map(({ out, map }) => (
-          <KmapBlock key={out.id} outName={out.label || out.id} n={ins.length} inNames={inNames} outMap={map} />
+        {maps.map(({ out, ins: usedIns, map }) => (
+          <KmapBlock key={out.id} outName={out.label || out.id} n={usedIns.length}
+            inNames={usedIns.map((g, i) => g.label || String.fromCharCode(65 + i))}
+            outMap={map} />
         ))}
       </div>
     </div>

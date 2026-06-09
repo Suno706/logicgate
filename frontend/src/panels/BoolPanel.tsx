@@ -1,48 +1,56 @@
 import { useState } from "react";
 import { Loader2, Sigma } from "lucide-react";
 import { useCircuitState } from "../store";
-import { collectOutputMap, deriveBool, type BoolDerivation } from "./boolUtils";
+import { collectOutputMap, deriveBool, inputsReachingOutput, type BoolDerivation } from "./boolUtils";
 import type { Gate } from "../types";
 
-interface OutResult { out: Gate; result: BoolDerivation }
+interface OutResult { out: Gate; ins: Gate[]; result: BoolDerivation }
 
 export function BoolPanel() {
   const { circuit } = useCircuitState();
-  const ins  = circuit.gates.filter((g) => g.type === "INPUT" || g.type === "CLOCK");
-  const outs = circuit.gates.filter((g) => g.type === "OUTPUT" || g.type === "LED");
+  const allIns = circuit.gates.filter((g) => g.type === "INPUT" || g.type === "CLOCK");
+  const outs   = circuit.gates.filter((g) => g.type === "OUTPUT" || g.type === "LED");
 
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
   const [results, setResults] = useState<OutResult[]>([]);
 
   async function build() {
-    if (!ins.length || !outs.length) {
-      setError("Need at least one INPUT and one OUTPUT.");
-      return;
-    }
-    if (ins.length > 32) {
-      setError(`Boolean derivation limited to 32 inputs. Your circuit has ${ins.length}.`);
-      return;
-    }
-    if (ins.length > 12) {
-      setError(`${ins.length} inputs → ${1 << ins.length} minterms. Above 12 inputs Quine-McCluskey can hang the browser. Reduce to ≤12 inputs.`);
+    if (!outs.length) {
+      setError("Need at least one OUTPUT gate.");
       return;
     }
     setLoading(true); setError(null);
     try {
-      const inNamesArr = ins.map((g, i) => g.label || String.fromCharCode(65 + i));
       const all: OutResult[] = [];
+      const warnings: string[] = [];
       for (const o of outs) {
-        const m = await collectOutputMap(circuit, ins, o);
-        all.push({ out: o, result: deriveBool(m, ins.length, inNamesArr) });
+        const reachable = inputsReachingOutput(circuit, o);
+        if (reachable.length === 0) {
+          warnings.push(`"${o.label || o.id}" has no INPUTs wired to it — skipped.`);
+          continue;
+        }
+        if (reachable.length > 12) {
+          warnings.push(`"${o.label || o.id}" depends on ${reachable.length} inputs (Quine-McCluskey caps at 12).`);
+          continue;
+        }
+        const inNamesArr = reachable.map((g, i) => g.label || String.fromCharCode(65 + i));
+        const m = await collectOutputMap(circuit, reachable, o);
+        all.push({ out: o, ins: reachable, result: deriveBool(m, reachable.length, inNamesArr) });
       }
       setResults(all);
+      setError(warnings.length ? warnings.join(" • ") : null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally { setLoading(false); }
   }
 
-  const inNames = ins.map((g, i) => g.label || String.fromCharCode(65 + i)).join(", ");
+  // Track which INPUTs are reachable from ANY output for the legend.
+  const reachableAcrossAll = new Set<string>();
+  for (const o of outs) {
+    for (const g of inputsReachingOutput(circuit, o)) reachableAcrossAll.add(g.id);
+  }
+  const ins = allIns;
 
   return (
     <div className="flex-1 flex flex-col p-3 gap-3 min-h-0 overflow-hidden">
@@ -57,21 +65,24 @@ export function BoolPanel() {
 
       {error && <div className="text-[9px] font-mono text-err flex-shrink-0">{error}</div>}
 
-      {/* Variable legend — show which canvas gate becomes which letter */}
+      {/* Variable legend — dim inputs that aren't connected to any output. */}
       {ins.length > 0 && (
         <div className="bg-bg-700/30 border border-bg-600 rounded p-2 flex-shrink-0">
           <div className="text-[8px] font-mono uppercase tracking-widest text-gray-600 mb-1">
-            Inputs (left → right = MSB → LSB)
+            Inputs (dimmed = not connected to any output)
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {ins.map((g, i) => (
-              <div key={g.id} className="flex items-center gap-1 text-[9px] font-mono">
-                <span className="px-1.5 py-0.5 rounded bg-accent/15 text-accent font-bold">
-                  {g.label || String.fromCharCode(65 + i)}
-                </span>
-                <span className="text-gray-600">= {g.id}</span>
-              </div>
-            ))}
+            {ins.map((g, i) => {
+              const used = reachableAcrossAll.has(g.id);
+              return (
+                <div key={g.id} className={`flex items-center gap-1 text-[9px] font-mono ${used ? "" : "opacity-40"}`}>
+                  <span className={`px-1.5 py-0.5 rounded font-bold ${used ? "bg-accent/15 text-accent" : "bg-bg-600 text-gray-500"}`}>
+                    {g.label || String.fromCharCode(65 + i)}
+                  </span>
+                  <span className="text-gray-600">= {g.id}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -83,9 +94,12 @@ export function BoolPanel() {
       )}
 
       <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
-        {results.map(({ out, result }) => (
-          <BoolBlock key={out.id} outName={out.label || out.id} r={result} inNames={inNames} />
-        ))}
+        {results.map(({ out, ins: usedIns, result }) => {
+          const local = usedIns.map((g, i) => g.label || String.fromCharCode(65 + i)).join(", ");
+          return (
+            <BoolBlock key={out.id} outName={out.label || out.id} r={result} inNames={local} />
+          );
+        })}
       </div>
     </div>
   );

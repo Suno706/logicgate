@@ -611,7 +611,20 @@ function SuggestTab({ circuit, dispatch }: { circuit: any; dispatch: any }) {
     try {
       const r = await suggestConnection(circuit, 8);
       setSuggs(r.suggestions ?? []);
-      if (!r.suggestions?.length) setErr("No suggestions at this time — try adding more gates first.");
+      if (!r.suggestions?.length) {
+        // Diagnose WHY there are no suggestions instead of a vague message.
+        const gateCount  = circuit.gates.length;
+        const logicGates = circuit.gates.filter(
+          (g: any) => !["INPUT", "OUTPUT", "CLOCK", "LED"].includes(g.type)
+        ).length;
+        if (gateCount === 0) {
+          setErr("Canvas is empty — drag some gates first.");
+        } else if (logicGates === 0) {
+          setErr("Only IO gates on the canvas — add an AND/OR/NOT/etc to get wiring suggestions.");
+        } else {
+          setErr("All input pins are already wired. Add a new gate (or remove a wire) to get more suggestions.");
+        }
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally { setL(false); }

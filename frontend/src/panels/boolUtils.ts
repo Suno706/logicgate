@@ -1,6 +1,30 @@
 import type { Circuit, Gate } from "../types";
 import { simulate } from "../api";
 
+/** Returns INPUT gates that have a wire path to `target` (backward BFS).
+ * Inputs not reachable from the target don't affect its value — they'd just
+ * add fake variables to the K-map / boolean expression. */
+export function inputsReachingOutput(circuit: Circuit, target: Gate): Gate[] {
+  const incoming = new Map<string, string[]>();
+  for (const w of circuit.wires) {
+    if (!incoming.has(w.to_gate)) incoming.set(w.to_gate, []);
+    incoming.get(w.to_gate)!.push(w.from_gate);
+  }
+  const seen = new Set<string>([target.id]);
+  const stack = [target.id];
+  while (stack.length) {
+    const id = stack.pop()!;
+    for (const src of incoming.get(id) || []) {
+      if (!seen.has(src)) {
+        seen.add(src);
+        stack.push(src);
+      }
+    }
+  }
+  return circuit.gates.filter((g) =>
+    (g.type === "INPUT" || g.type === "CLOCK") && seen.has(g.id));
+}
+
 /** Sweep every input combination, return outMap[mask] = 0|1 for one OUTPUT gate. */
 export async function collectOutputMap(
   circuit: Circuit,

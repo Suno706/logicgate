@@ -13,9 +13,9 @@ frontend/node_modules/
 # Circuit files — persist via volume mount, not baked into the image
 circuits/*.json
 
-# ML model pickles — retrained on first boot from CSV
-# Comment out to bake pre-trained models into the image
-ml_models/saved/
+# ML model pickles — baked into image so free-tier boot doesn't time out.
+# (Uncomment to retrain on first boot instead.)
+# ml_models/saved/
 
 # Dev / test artifacts
 tests/__pycache__/

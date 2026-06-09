@@ -777,7 +777,10 @@ if __name__ == '__main__':
     # Local dev defaults; PaaS hosts set $PORT and we honour it.
     # MUST use socketio.run instead of app.run so WebSocket connections work.
     port  = int(os.environ.get('PORT', '5000'))
-    debug = os.environ.get('FLASK_DEBUG', '1') == '1'
+    # Debug off in production (FLASK_ENV=production) — debug=True spawns a
+    # reloader child that doubles memory usage and OOMs the 512Mi free tier.
+    _default_debug = '0' if os.environ.get('FLASK_ENV', '').lower() == 'production' else '1'
+    debug = os.environ.get('FLASK_DEBUG', _default_debug) == '1'
     socketio.run(
         app,
         host='0.0.0.0', port=port,

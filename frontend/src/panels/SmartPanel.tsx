@@ -344,7 +344,14 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
       const r = await buildQuestion(q2);
       if (r.circuit) {
         dispatch({ type: "SET_CIRCUIT", circuit: r.circuit });
-        setInfo(r.info ?? null);
+        // Merge a backend-provenance snippet into info so the user can see
+        // which ML / synthesis path produced the circuit.
+        setInfo({
+          ...(r.info ?? {}),
+          confidence: (r as any).confidence,
+          ml_source:  (r as any).ml_source || "boolean_synth",
+          intent:     (r as any).intent,
+        });
         setShowStruct(false);
       } else if (r.answer) {
         setErr(r.answer);
@@ -768,6 +775,38 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
             </div>
           </div>
 
+          {/* Show the exact POST body so it's obvious the backend is hit */}
+          {(sMode !== "template" || sPlaceMode === "expand") && (() => {
+            let preview = "";
+            if (sMode === "template") preview = `build ${sTemplate}`;
+            else if (sMode === "expr") {
+              const cleaned = bExprs.slice(0, bOutputs)
+                .map((e, i) => ({ name: bOutputs > 1 ? `Y${i + 1}` : "Y", expr: e.trim() }))
+                .filter((x) => x.expr);
+              preview = cleaned.length
+                ? (cleaned.length === 1 && bOutputs === 1
+                    ? `build ${cleaned[0].expr}`
+                    : "build " + cleaned.map((c) => `${c.name} = ${c.expr}`).join(" ; "))
+                : "(no expressions yet)";
+            } else if (sMode === "truth") {
+              const sops = truthTableSOPs().filter((s) => s.expr !== "0");
+              preview = sops.length
+                ? (tOutputs === 1
+                    ? `build ${sops[0].expr}`
+                    : "build " + sops.map((s) => `${s.name} = ${s.expr}`).join(" ; "))
+                : "(no 1-bits set)";
+            }
+            if (sGates.length > 0) preview += ` using ${sGates.join(" and ")}`;
+            return (
+              <div className="bg-bg-800 border border-bg-600 rounded p-1.5">
+                <div className="text-[8px] font-mono uppercase tracking-widest text-gray-600 mb-0.5">
+                  POST /api/build/question →
+                </div>
+                <code className="text-[9px] font-mono text-gray-400 break-all">{preview}</code>
+              </div>
+            );
+          })()}
+
           <button
             onClick={buildFromStruct}
             disabled={loading}
@@ -786,11 +825,31 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
 
       {info && (
         <div className="bg-bg-700 border border-bg-600 rounded p-2.5 text-[9px] font-mono text-gray-500 space-y-0.5">
+          {info.placed_macro && (
+            <div className="text-accent">
+              Placed macro block: <span className="text-gray-300">{info.placed_macro}</span>
+              <span className="text-gray-600"> (client-side, no backend call)</span>
+            </div>
+          )}
           {info.gate_count != null && <div>Gates: <span className="text-gray-300">{info.gate_count}</span></div>}
           {info.wire_count != null && <div>Wires: <span className="text-gray-300">{info.wire_count}</span></div>}
           {info.input_vars?.length > 0 && <div>Inputs: <span className="text-gray-300">{info.input_vars.join(", ")}</span></div>}
           {info.target_gates && <div>Gates used: <span className="text-gray-300">{info.target_gates.join(", ")}</span></div>}
           {info.simplified && <div className="mt-1 text-gray-600 break-all">= {info.simplified}</div>}
+          {/* Backend / ML provenance — confirms it actually hit the server */}
+          {(info.ml_source || info.confidence != null) && (
+            <div className="pt-1 mt-1 border-t border-bg-600 flex flex-wrap gap-x-2 text-gray-600">
+              {info.ml_source && (
+                <span>backend: <span className="text-accent">{info.ml_source}</span></span>
+              )}
+              {info.intent && (
+                <span>intent: <span className="text-gray-400">{info.intent}</span></span>
+              )}
+              {info.confidence != null && (
+                <span>confidence: <span className="text-gray-400">{(info.confidence * 100).toFixed(0)}%</span></span>
+              )}
+            </div>
+          )}
         </div>
       )}
 

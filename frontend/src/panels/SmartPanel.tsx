@@ -629,6 +629,46 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
             )}
           </div>
 
+          {/* Single-block inserts: drop a macro gate (HA, FA, DFF...) onto the
+              canvas without going through the boolean synthesizer. */}
+          <div>
+            <label className="text-[9px] font-mono text-gray-500 block mb-1">
+              Insert block (drops a single macro on the canvas)
+            </label>
+            <div className="flex flex-wrap gap-1">
+              {[
+                ["HA", "Half adder"],
+                ["FA", "Full adder"],
+                ["MUX2", "2:1 MUX"],
+                ["MUX4", "4:1 MUX"],
+                ["DEC24", "2:4 Dec"],
+                ["DEC38", "3:8 Dec"],
+                ["ENC42", "4:2 Enc"],
+                ["DFF", "D-FF"],
+                ["JKFF", "JK-FF"],
+                ["TFF", "T-FF"],
+                ["SRLATCH", "SR Latch"],
+                ["REG4", "4-bit Reg"],
+                ["CMP2", "2-bit cmp"],
+              ].map(([type, label]) => (
+                <button
+                  key={type}
+                  title={`Drop a single ${label} block`}
+                  onClick={() => {
+                    const id = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+                    dispatch({
+                      type: "ADD_GATE",
+                      gate: { id, type, x: 200 + Math.random() * 100, y: 160 + Math.random() * 100 } as any,
+                    });
+                  }}
+                  className="px-2 py-0.5 rounded text-[9px] font-mono border bg-bg-800 border-bg-600 text-gray-400 hover:border-accent hover:text-accent transition-all"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button
             onClick={buildFromStruct}
             disabled={loading}

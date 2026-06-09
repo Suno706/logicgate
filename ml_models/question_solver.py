@@ -2917,6 +2917,38 @@ class QuestionSolver:
         target_label = (f" using only {'/'.join(target)}"
                         if target else "")
 
+        # ── Multi-output spec: "Y1 = expr1 ; Y2 = expr2 ; ..." ────────────
+        # Emitted by the SMART truth-table builder for circuits with >1 output.
+        # Detect a `;` between two `Name = expr` clauses and route through
+        # _build_multi_output.
+        if ';' in body and re.search(r'[A-Za-z_]\w*\s*=', body):
+            parts = []
+            for chunk in re.split(r'\s*;\s*', body):
+                m_chunk = re.match(r'^\s*([A-Za-z_]\w*)\s*=\s*(.+?)\s*$', chunk)
+                if m_chunk:
+                    parts.append((m_chunk.group(1), m_chunk.group(2)))
+            if len(parts) >= 2:
+                try:
+                    circuit, info = self._build_multi_output(parts, target)
+                except BooleanParseError as e:
+                    return self._impossible_target_answer(
+                        f"multi-output ({len(parts)} outputs)", target, str(e))
+                return {
+                    'answer':     f"Built **multi-output circuit**{target_label}  -  "
+                                  f"{info['gate_count']} logic gate"
+                                  f"{'s' if info['gate_count'] != 1 else ''}, "
+                                  f"{info['wire_count']} wires, "
+                                  f"{len(parts)} outputs.",
+                    'confidence': 0.9,
+                    'circuit':    circuit,
+                    'info':       info,
+                    'details':    info,
+                    'suggestions': [
+                        "Press RUN to simulate.",
+                        "Open K-Map / BOOL tabs to verify each output.",
+                    ],
+                }
+
         # 0a. Parametric N-bit synthesis ("4-bit adder", "8-bit comparator").
         #     Tried before fixed templates so "1 bit adder" still maps to
         #     full adder via the alias rule, but "4 bit adder" goes here.

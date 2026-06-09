@@ -266,8 +266,15 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
   const [sMode,       setSMode]       = useState<Mode>("template");
   const [sTemplate,   setSTemplate]   = useState<string>("half adder");
   const [sPlaceMode,  setSPlaceMode]  = useState<"place" | "expand">("place");
-  const [sExpr,       setSExpr]       = useState<string>("");
+  // sExpr legacy single-input expr is kept around so the existing build path
+  // keeps compiling, but the UI now uses bExprs (one per output).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_sExpr, _setSExpr] = useState<string>("");
   const [sGates,      setSGates]      = useState<string[]>([]);  // empty = mixed
+  // Boolean mode (per-output expression) state
+  const [bInputs,     setBInputs]     = useState<number>(3);
+  const [bOutputs,    setBOutputs]    = useState<number>(1);
+  const [bExprs,      setBExprs]      = useState<string[]>(["A & B | C"]);
 
   // Template name -> macro gate type (those that have a single-block form).
   const MACRO_TYPE_BY_TEMPLATE: Record<string, string> = {
@@ -368,8 +375,22 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     }
 
     let q2 = "";
-    if (sMode === "expr" && sExpr.trim()) {
-      q2 = `build ${sExpr.trim()}`;
+    if (sMode === "expr") {
+      // Per-output Boolean mode: collect non-empty exprs and ship as
+      // single-output "build EXPR" or multi-output "build Y1 = ... ; Y2 = ...".
+      const cleaned = bExprs
+        .slice(0, bOutputs)
+        .map((e, i) => ({ name: bOutputs > 1 ? `Y${i + 1}` : "Y", expr: e.trim() }))
+        .filter((x) => x.expr.length > 0);
+      if (cleaned.length === 0) {
+        setErr("Enter at least one boolean expression to build.");
+        return;
+      }
+      if (cleaned.length === 1 && bOutputs === 1) {
+        q2 = `build ${cleaned[0].expr}`;
+      } else {
+        q2 = "build " + cleaned.map((c) => `${c.name} = ${c.expr}`).join(" ; ");
+      }
     } else if (sMode === "truth") {
       const outExprs = truthTableSOPs();
       const nonZero  = outExprs.filter((o) => o.expr !== "0");
@@ -405,6 +426,18 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     setTBits((prev) => prev.map((r, i) =>
       i === row ? r.map((b, j) => (j === col ? ((b ^ 1) as 0 | 1) : b)) : r
     ));
+  }
+  // Boolean mode helpers
+  function resizeBooleanOutputs(n: number) {
+    setBOutputs(n);
+    setBExprs((prev) => {
+      const out = prev.slice(0, n);
+      while (out.length < n) out.push("");
+      return out;
+    });
+  }
+  function setExprAt(i: number, v: string) {
+    setBExprs((prev) => prev.map((x, idx) => (idx === i ? v : x)));
   }
   // Derive SOP expression per output for live preview AND for the build call.
   function truthTableSOPs(): { name: string; expr: string }[] {
@@ -517,19 +550,57 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
           )}
 
           {sMode === "expr" && (
-            <div>
-              <label className="text-[9px] font-mono text-gray-500 block mb-1">
-                Boolean expression
-              </label>
-              <input
-                type="text"
-                value={sExpr}
-                onChange={(e) => setSExpr(e.target.value)}
-                placeholder="e.g. (A&B) | (~A&C) | (B^C)"
-                className="w-full bg-bg-800 border border-bg-600 rounded px-2 py-1 text-[10px] font-mono text-gray-200 focus:outline-none focus:border-accent placeholder-gray-700"
-              />
-              <div className="text-[8px] font-mono text-gray-600 mt-1">
-                Operators: <code>&amp;</code> = AND, <code>|</code> = OR, <code>~</code> = NOT, <code>^</code> = XOR
+            <div className="space-y-1.5">
+              {/* Input count + name preview */}
+              <div className="flex items-center gap-2 text-[9px] font-mono text-gray-500 flex-wrap">
+                <span>Inputs:</span>
+                {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  <button key={n} onClick={() => setBInputs(n)}
+                    className={`px-1.5 py-0.5 rounded border ${
+                      bInputs === n
+                        ? "bg-accent/25 border-accent text-accent"
+                        : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500"
+                    }`}
+                  >{n}</button>
+                ))}
+                <span className="text-gray-600">→</span>
+                <span className="text-accent">{"ABCDEFGH".slice(0, bInputs).split("").join(", ")}</span>
+              </div>
+
+              {/* Output count */}
+              <div className="flex items-center gap-2 text-[9px] font-mono text-gray-500 flex-wrap">
+                <span>Outputs:</span>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  <button key={n} onClick={() => resizeBooleanOutputs(n)}
+                    className={`px-1.5 py-0.5 rounded border ${
+                      bOutputs === n
+                        ? "bg-accent/25 border-accent text-accent"
+                        : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500"
+                    }`}
+                  >{n}</button>
+                ))}
+              </div>
+
+              {/* One input row per output */}
+              <div className="space-y-1.5">
+                {Array.from({ length: bOutputs }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-accent font-bold w-7">
+                      {bOutputs > 1 ? `Y${i + 1}` : "Y"} =
+                    </span>
+                    <input
+                      type="text"
+                      value={bExprs[i] || ""}
+                      onChange={(e) => setExprAt(i, e.target.value)}
+                      placeholder={`expression using ${"ABCDEFGH".slice(0, bInputs).split("").join(",")}`}
+                      className="flex-1 bg-bg-800 border border-bg-600 rounded px-2 py-1 text-[10px] font-mono text-gray-200 focus:outline-none focus:border-accent placeholder-gray-700"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-[8px] font-mono text-gray-600">
+                Operators: <code>&amp;</code> = AND, <code>|</code> = OR, <code>~</code> = NOT, <code>^</code> = XOR, <code>(...)</code> grouping
               </div>
             </div>
           )}

@@ -50,6 +50,26 @@ export function markRoomOwned(code: string): void {
   } catch { /* localStorage unavailable */ }
 }
 
+/** Store the owner_token returned by /api/rooms/new. Sent on later
+ * owner-only calls so the server keeps recognizing us as host even after
+ * setRoom() rewrites session_id to "room_<code>". */
+export function saveOwnerToken(code: string, token: string): void {
+  try {
+    const obj = JSON.parse(localStorage.getItem("logicgate.owner_tokens") || "{}");
+    obj[code.toUpperCase()] = token;
+    localStorage.setItem("logicgate.owner_tokens", JSON.stringify(obj));
+  } catch { /* */ }
+}
+export function getOwnerToken(code: string | null | undefined): string | null {
+  if (!code) return null;
+  try {
+    const obj = JSON.parse(localStorage.getItem("logicgate.owner_tokens") || "{}");
+    return obj[code.toUpperCase()] || null;
+  } catch {
+    return null;
+  }
+}
+
 export function isRoomOwner(code: string | null | undefined): boolean {
   if (!code) return false;
   try {
@@ -60,15 +80,19 @@ export function isRoomOwner(code: string | null | undefined): boolean {
   }
 }
 
-/** Server-trusted owner check — survives clearing browser storage and works
- * across devices when the user is signed in (backend keys by user UID). */
+/** Server-trusted owner check — accepts either matching session_id OR a
+ * stored owner_token (covers guests after setRoom() rewrites session_id). */
 export async function fetchRoomInfo(code: string): Promise<{
   exists: boolean;
   is_owner: boolean;
   max_users?: number;
 }> {
+  const tok = getOwnerToken(code);
   const res = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
-    headers: { "X-Session-Id": getSessionId() },
+    headers: {
+      "X-Session-Id": getSessionId(),
+      ...(tok ? { "X-Owner-Token": tok } : {}),
+    },
   });
   if (!res.ok) return { exists: false, is_owner: false };
   const d = await res.json();
@@ -80,10 +104,25 @@ export async function fetchRoomInfo(code: string): Promise<{
 }
 
 export async function kickFromRoom(code: string, target_sid: string) {
-  return postJSON<{ success: boolean; kicked: boolean }>(
-    `/api/rooms/${encodeURIComponent(code)}/kick`,
-    { target_sid }
-  );
+  const tok = getOwnerToken(code);
+  const res = await fetch(`/api/rooms/${encodeURIComponent(code)}/kick`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Session-Id": getSessionId(),
+      ...(tok ? { "X-Owner-Token": tok } : {}),
+    },
+    body: JSON.stringify({ target_sid }),
+  });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const j = await res.json();
+      if (j?.message || j?.error) msg = j.message ?? j.error;
+    } catch { /* */ }
+    throw new Error(msg);
+  }
+  return res.json() as Promise<{ success: boolean; kicked: boolean }>;
 }
 
 function authHeaders(): Record<string, string> {

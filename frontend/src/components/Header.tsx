@@ -8,7 +8,7 @@ import type { Tool } from "../types";
 import { useCircuitState, useCircuitDispatch, useCircuitActions } from "../store";
 import { simulate, saveCircuit, listAllCircuits, loadCircuit,
          getSessionId, setRoom, getRoomCode, markRoomOwned,
-         isRoomOwner } from "../api";
+         isRoomOwner, saveOwnerToken, getOwnerToken } from "../api";
 import { getDisplayName, signOut } from "./SignInGate";
 import { PresenceBadge } from "./PresenceBadge";
 import { useToast } from "./Toast";
@@ -180,8 +180,11 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
       const data = await res.json();
       if (data.code) {
         setRoomInput(data.code);
-        // Remember owner status so the kick button shows on next reload.
+        // Remember owner status (localStorage hint) and save the owner_token
+        // so the server keeps recognising us as host after setRoom() below
+        // rewrites our session_id.
         markRoomOwned(data.code);
+        if (data.owner_token) saveOwnerToken(data.code, data.owner_token);
         // Auto-join the new room and update the URL so it's shareable.
         setRoom(data.code);
         setCurrentRoom(data.code);
@@ -531,19 +534,25 @@ function CurrentRoomBlock(
 
   useEffect(() => {
     let alive = true;
-    fetch(`/api/rooms/${encodeURIComponent(currentRoom)}`, {
-      headers: { "X-Session-Id": getSessionId() },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!alive) return;
-        if (d?.max_users) {
-          setMaxUsers(d.max_users);
-          setPending(d.max_users);
-        }
-        if (typeof d?.is_owner === "boolean") setServerIsOwner(d.is_owner);
+    {
+      const tok = getOwnerToken(currentRoom);
+      fetch(`/api/rooms/${encodeURIComponent(currentRoom)}`, {
+        headers: {
+          "X-Session-Id": getSessionId(),
+          ...(tok ? { "X-Owner-Token": tok } : {}),
+        },
       })
-      .catch(() => {/* offline — keep default */});
+        .then((r) => r.json())
+        .then((d) => {
+          if (!alive) return;
+          if (d?.max_users) {
+            setMaxUsers(d.max_users);
+            setPending(d.max_users);
+          }
+          if (typeof d?.is_owner === "boolean") setServerIsOwner(d.is_owner);
+        })
+        .catch(() => {/* offline — keep default */});
+    }
     return () => { alive = false; };
   }, [currentRoom]);
 
@@ -554,9 +563,14 @@ function CurrentRoomBlock(
     }
     setError(null);
     try {
+      const tok = getOwnerToken(currentRoom);
       const res = await fetch(`/api/rooms/${encodeURIComponent(currentRoom)}/config`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Session-Id": getSessionId() },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Id": getSessionId(),
+          ...(tok ? { "X-Owner-Token": tok } : {}),
+        },
         body: JSON.stringify({ max_users: pending }),
       });
       const data = await res.json();

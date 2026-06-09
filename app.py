@@ -275,15 +275,31 @@ def list_short():
 
 @app.route('/api/rooms/new', methods=['POST'])
 def room_new():
-    """Auto-generate a 6-character room code. Caller becomes the room owner
-    (their session_id is stored as created_by) so they can kick other users."""
+    """Auto-generate a 6-character room code and an owner_token. The token is
+    returned ONCE and the client must store it to be recognized as host on
+    subsequent calls (the session_id alone isn't enough for guests because
+    setRoom() in the client rewrites it to 'room_<code>')."""
     try:
         sid = _session_id()
-        code = db.generate_room_code(owner_session=sid)
+        code, token = db.generate_room_code(owner_session=sid)
         return jsonify({'success': True, 'code': code,
-                        'url': f'/?room={code}', 'is_owner': True})
+                        'url': f'/?room={code}',
+                        'is_owner': True,
+                        'owner_token': token})
     except Exception as e:
         return _err(e, exc=e)
+
+
+def _is_room_owner(code: str) -> bool:
+    """Owner check that accepts EITHER a matching session_id OR a valid
+    X-Owner-Token header. The token path lets guest creators stay
+    recognized after setRoom() rewrites their session_id."""
+    if db.get_room_owner(code) == _session_id():
+        return True
+    tok = request.headers.get('X-Owner-Token', '').strip()
+    if tok and db.verify_owner_token(code, tok):
+        return True
+    return False
 
 
 @app.route('/api/rooms/<code>', methods=['GET'])
@@ -293,8 +309,7 @@ def room_info(code):
         info = db.get_room(code)
         if not info:
             return jsonify({'exists': False, 'code': code})
-        owner = db.get_room_owner(code)
-        is_owner = bool(owner) and owner == _session_id()
+        is_owner = _is_room_owner(code)
         max_users = db.get_room_max_users(code)
         return jsonify({'exists': True, 'is_owner': is_owner,
                         'max_users': max_users, **info})
@@ -318,9 +333,12 @@ def room_config(code):
             return _err('max_users must be an integer', 400)
         if max_users < 2 or max_users > 100:
             return _err('max_users must be between 2 and 100', 400)
-        ok = db.set_room_max_users(code, _session_id(), max_users)
-        if not ok:
+        if not _is_room_owner(code):
             return _err('Only the room owner can change settings.', 403)
+        # Directly update — we already verified ownership via token-or-session.
+        with db.cursor() as cur:
+            cur.execute("UPDATE rooms SET max_users = ? WHERE code = ?",
+                        (max_users, code))
         return jsonify({'success': True, 'max_users': max_users})
     except Exception as e:
         return _err(e, exc=e)
@@ -336,10 +354,9 @@ def room_kick(code):
         target_sid = (data.get('target_sid') or '').strip()
         if not target_sid:
             return _err('Missing target_sid', 400)
-        owner = db.get_room_owner(code)
-        if not owner:
+        if not db.get_room_owner(code):
             return _err('Room has no owner — cannot kick.', 403)
-        if owner != _session_id():
+        if not _is_room_owner(code):
             return _err('Only the room owner can kick users.', 403)
         from realtime import kick_socket
         ok = kick_socket(code, target_sid)

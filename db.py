@@ -93,14 +93,19 @@ def _init_schema(conn: sqlite3.Connection):
             created_by    TEXT,
             created_at    REAL NOT NULL,
             last_used_at  REAL NOT NULL,
-            max_users     INTEGER DEFAULT 20
+            max_users     INTEGER DEFAULT 20,
+            owner_token   TEXT
         );
     """)
-    # Add max_users column if upgrading from an older schema.
-    try:
-        conn.execute("ALTER TABLE rooms ADD COLUMN max_users INTEGER DEFAULT 20")
-    except Exception:
-        pass  # already exists
+    # Add missing columns if upgrading from an older schema.
+    for col_sql in (
+        "ALTER TABLE rooms ADD COLUMN max_users INTEGER DEFAULT 20",
+        "ALTER TABLE rooms ADD COLUMN owner_token TEXT",
+    ):
+        try:
+            conn.execute(col_sql)
+        except Exception:
+            pass  # already exists
     conn.commit()
 
 
@@ -223,10 +228,13 @@ import secrets   # noqa: E402
 
 
 def generate_room_code(length: int = 6, owner_session: str = None,
-                       max_users: int = 20) -> str:
-    """Generate a unique room code. owner_session: caller's session_id, stored
-    as text so guests (s_xxx) AND signed-in users (u_xxx_yyy / g_xxx) can own
-    a room and kick others. max_users caps concurrent connections (default 20)."""
+                       max_users: int = 20) -> tuple:
+    """Generate a unique room code AND an owner token. Returns (code, token).
+    The token is the secret kept client-side so the original creator stays
+    recognized as host even after setRoom() rewrites their session_id to
+    'room_<code>' (which makes session_id-based owner checks useless for guests).
+    """
+    token = secrets.token_urlsafe(16)
     for _ in range(20):
         code = "".join(secrets.choice(_ROOM_ALPHABET) for _ in range(length))
         with cursor() as cur:
@@ -235,12 +243,24 @@ def generate_room_code(length: int = 6, owner_session: str = None,
             ).fetchone()
             if not exists:
                 cur.execute(
-                    "INSERT INTO rooms (code, created_by, created_at, last_used_at, max_users) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (code, owner_session, time.time(), time.time(), max_users),
+                    "INSERT INTO rooms (code, created_by, created_at, last_used_at, max_users, owner_token) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (code, owner_session, time.time(), time.time(), max_users, token),
                 )
-                return code
+                return code, token
     raise RuntimeError("Could not generate unique room code")
+
+
+def verify_owner_token(code: str, token: str) -> bool:
+    """Returns True if the caller's owner_token matches the one minted at
+    room creation. Survives session_id rewrites caused by setRoom()."""
+    if not token:
+        return False
+    with cursor() as cur:
+        row = cur.execute(
+            "SELECT owner_token FROM rooms WHERE code = ?", (code,)
+        ).fetchone()
+        return bool(row) and row["owner_token"] == token
 
 
 def get_room_owner(code: str) -> Optional[str]:

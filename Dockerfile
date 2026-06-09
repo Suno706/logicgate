@@ -13,7 +13,7 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PORT=5000 \
+    PORT=7860 \
     FLASK_ENV=production
 
 WORKDIR /app
@@ -31,7 +31,7 @@ COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
 # Saved circuits persist across restarts via a volume mount
 RUN mkdir -p circuits
 
-EXPOSE 5000
+EXPOSE 7860
 
 # Use Flask-SocketIO's built-in server (threading async mode is configured
 # in realtime.py). Avoids eventlet/gevent compatibility issues on Python 3.12.

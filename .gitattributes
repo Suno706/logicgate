@@ -1,0 +1,2 @@
+data/nl_training.csv filter=lfs diff=lfs merge=lfs -text
+data/circuit_patterns.csv filter=lfs diff=lfs merge=lfs -text

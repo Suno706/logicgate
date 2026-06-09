@@ -45,6 +45,7 @@ export function SignInGate() {
   const [busy, setBusy]   = useState(false);
   const [error, setError] = useState("");
   const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/config").then((r) => r.json())
@@ -178,11 +179,22 @@ export function SignInGate() {
             </div>
             <div>
               <label className="text-[8px] font-mono uppercase tracking-widest text-gray-600 block mb-1">Password</label>
-              <input type="password"
-                className="w-full bg-bg-700 border border-bg-600 rounded-lg px-3 py-2 text-sm font-mono text-gray-100 focus:outline-none focus:border-accent transition-colors"
-                value={password} onChange={(e) => setP(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && submit()}
-                placeholder="at least 6 characters" />
+              <div className="relative">
+                <input type={showPassword ? "text" : "password"}
+                  className="w-full bg-bg-700 border border-bg-600 rounded-lg pl-3 pr-10 py-2 text-sm font-mono text-gray-100 focus:outline-none focus:border-accent transition-colors"
+                  value={password} onChange={(e) => setP(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submit()}
+                  placeholder="at least 6 characters" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-accent transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "🙈" : "👁"}
+                </button>
+              </div>
             </div>
             {error && <div className="text-[10px] font-mono text-err">{error}</div>}
             <div className="flex gap-2">

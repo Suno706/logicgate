@@ -25,9 +25,21 @@ export function KmapPanel() {
       for (const o of outs) {
         // Only inputs that have a wire path to this output affect it.
         const reachable = inputsReachingOutput(circuit, o);
-        if (reachable.length < 1) {
+        if (reachable.length === 0) {
           warnings.push(`"${o.label || o.id}" has no INPUTs wired to it — skipped.`);
           continue;
+        }
+        if (reachable.length === 1) {
+          // K-map renders 2-var minimum; pad with the user's other input
+          // (next not-yet-included input) so the map still shows.
+          const filler = circuit.gates.find(
+            (g) => (g.type === "INPUT" || g.type === "CLOCK") && g.id !== reachable[0].id
+          );
+          if (filler) reachable.push(filler);
+          else {
+            warnings.push(`"${o.label || o.id}" depends on only 1 input — add another INPUT to draw a K-map.`);
+            continue;
+          }
         }
         if (reachable.length > 6) {
           warnings.push(`"${o.label || o.id}" depends on ${reachable.length} inputs — K-maps support up to 6.`);

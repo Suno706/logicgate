@@ -263,38 +263,69 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
 
   // Structured-input fallback state
   type Mode = "template" | "expr" | "truth";
-  const [sMode,     setSMode]     = useState<Mode>("template");
-  const [sTemplate, setSTemplate] = useState<string>("half adder");
-  const [sExpr,     setSExpr]     = useState<string>("");
-  const [sGates,    setSGates]    = useState<string[]>([]);  // empty = mixed
+  const [sMode,       setSMode]       = useState<Mode>("template");
+  const [sTemplate,   setSTemplate]   = useState<string>("half adder");
+  const [sPlaceMode,  setSPlaceMode]  = useState<"place" | "expand">("place");
+  const [sExpr,       setSExpr]       = useState<string>("");
+  const [sGates,      setSGates]      = useState<string[]>([]);  // empty = mixed
+
+  // Template name -> macro gate type (those that have a single-block form).
+  const MACRO_TYPE_BY_TEMPLATE: Record<string, string> = {
+    "half adder":          "HA",
+    "full adder":          "FA",
+    "2 bit comparator":    "CMP2",
+    "2 to 1 mux":          "MUX2",
+    "4 to 1 mux":          "MUX4",
+    "2 to 4 decoder":      "DEC24",
+    "3 to 8 decoder":      "DEC38",
+    "4 to 2 encoder":      "ENC42",
+    "d flip flop":         "DFF",
+    "jk flip flop":        "JKFF",
+    "t flip flop":         "TFF",
+    "sr latch":            "SRLATCH",
+    "sr latch nand":       "SRLATCH",
+    "4 bit shift register":"REG4",
+  };
+  const canPlaceCurrent = !!MACRO_TYPE_BY_TEMPLATE[sTemplate];
   // Truth-table state — tBits[row][col] = output bit (rows × outputs)
   const [tInputs,   setTInputs]   = useState<number>(2);
   const [tOutputs,  setTOutputs]  = useState<number>(1);
   const [tBits,     setTBits]     = useState<(0 | 1)[][]>([[0],[0],[0],[1]]); // default = AND
 
-  const TEMPLATES = [
-    // ── Gates ──
-    "and gate", "or gate", "not gate", "xor gate", "xnor gate", "nand gate", "nor gate",
-    "buffer", "inverter",
-    // ── Arithmetic ──
-    "half adder", "full adder", "full adder using half adder",
-    "half subtractor", "full subtractor",
-    "2 bit adder", "4 bit adder", "8 bit adder",
-    "2 bit subtractor", "4 bit subtractor",
-    "2 bit comparator", "4 bit comparator",
-    "2 bit multiplier",
-    // ── Combinational ──
-    "2 to 1 mux", "4 to 1 mux", "8 to 1 mux",
-    "1 to 2 demux", "1 to 4 demux", "1 to 8 demux",
-    "2 to 4 decoder", "3 to 8 decoder", "bcd to 7 segment decoder",
-    "4 to 2 encoder", "8 to 3 encoder", "priority encoder valid",
-    "parity", "majority gate",
-    // ── Sequential / latches & flip-flops ──
-    "sr latch", "sr latch nand", "d latch", "gated d latch",
-    "d flip flop", "jk flip flop", "sr flip flop", "t flip flop",
-    "master slave flip flop",
-    // ── Registers / counters ──
-    "4 bit shift register", "4 bit counter",
+  const TEMPLATE_GROUPS: { label: string; items: string[] }[] = [
+    { label: "Library Gates", items: [
+        "and gate", "or gate", "not gate", "xor gate", "xnor gate",
+        "nand gate", "nor gate", "buffer", "inverter",
+    ]},
+    { label: "Arithmetic", items: [
+        "half adder", "full adder", "full adder using half adder",
+        "half subtractor", "full subtractor",
+        "2 bit adder", "4 bit adder", "8 bit adder",
+        "2 bit subtractor", "4 bit subtractor",
+        "2 bit comparator", "4 bit comparator",
+        "2 bit multiplier",
+    ]},
+    { label: "Multiplexers / Demultiplexers", items: [
+        "2 to 1 mux", "4 to 1 mux", "8 to 1 mux",
+        "1 to 2 demux", "1 to 4 demux", "1 to 8 demux",
+    ]},
+    { label: "Decoders / Encoders / BCD", items: [
+        "2 to 4 decoder", "3 to 8 decoder", "bcd to 7 segment decoder",
+        "4 to 2 encoder", "8 to 3 encoder", "priority encoder valid",
+    ]},
+    { label: "Other Combinational", items: [
+        "parity", "majority gate",
+    ]},
+    { label: "Latches", items: [
+        "sr latch", "sr latch nand", "d latch", "gated d latch",
+    ]},
+    { label: "Flip-Flops", items: [
+        "d flip flop", "jk flip flop", "sr flip flop", "t flip flop",
+        "master slave flip flop",
+    ]},
+    { label: "Registers / Counters", items: [
+        "4 bit shift register", "4 bit counter",
+    ]},
   ];
   const GATE_OPTIONS = ["NAND", "NOR", "AND", "OR", "NOT", "XOR", "XNOR"];
 
@@ -320,6 +351,22 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
   }
 
   function buildFromStruct() {
+    // Place mode: drop a single macro gate without round-tripping to the backend.
+    if (sMode === "template" && sPlaceMode === "place" && canPlaceCurrent) {
+      const macroType = MACRO_TYPE_BY_TEMPLATE[sTemplate];
+      const id = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+      dispatch({
+        type: "ADD_GATE",
+        gate: { id, type: macroType, x: 200, y: 160 } as any,
+      });
+      setInfo({ gate_count: 1, wire_count: 0,
+                input_vars: [], outputs: [],
+                target_gates: null,
+                placed_macro: macroType });
+      setShowStruct(false);
+      return;
+    }
+
     let q2 = "";
     if (sMode === "expr" && sExpr.trim()) {
       q2 = `build ${sExpr.trim()}`;
@@ -430,15 +477,40 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
           </div>
 
           {sMode === "template" && (
-            <div>
-              <label className="text-[9px] font-mono text-gray-500 block mb-1">Pick a circuit</label>
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-mono text-gray-500 block">Pick a circuit</label>
               <select
                 value={sTemplate}
                 onChange={(e) => setSTemplate(e.target.value)}
                 className="w-full bg-bg-800 border border-bg-600 rounded px-2 py-1 text-[10px] font-mono text-gray-200 focus:outline-none focus:border-accent"
               >
-                {TEMPLATES.map((t) => <option key={t} value={t}>{t}</option>)}
+                {TEMPLATE_GROUPS.map((g) => (
+                  <optgroup key={g.label} label={g.label}>
+                    {g.items.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </optgroup>
+                ))}
               </select>
+              {/* Place vs Expand toggle (Place = single macro block, Expand = synthesize from primitives) */}
+              <div className="flex gap-1 text-[9px] font-mono">
+                <button
+                  onClick={() => setSPlaceMode("place")}
+                  disabled={!canPlaceCurrent}
+                  title={canPlaceCurrent ? "Drop a single macro block" : "This template has no single-block form — only Expand available"}
+                  className={`flex-1 py-1 rounded border transition-all ${
+                    sPlaceMode === "place" && canPlaceCurrent
+                      ? "bg-accent/25 border-accent text-accent"
+                      : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500 disabled:opacity-40"
+                  }`}
+                >Place (single block)</button>
+                <button
+                  onClick={() => setSPlaceMode("expand")}
+                  className={`flex-1 py-1 rounded border transition-all ${
+                    sPlaceMode === "expand" || !canPlaceCurrent
+                      ? "bg-accent/25 border-accent text-accent"
+                      : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500"
+                  }`}
+                >Expand (from gates)</button>
+              </div>
             </div>
           )}
 
@@ -476,7 +548,7 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
               </div>
               <div className="flex items-center gap-2 text-[9px] font-mono text-gray-500 flex-wrap">
                 <span>Outputs:</span>
-                {[1, 2, 3, 4, 6, 8].map((n) => (
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                   <button key={n} onClick={() => resizeTruthTable(tInputs, n)}
                     className={`px-1.5 py-0.5 rounded border ${
                       tOutputs === n

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { collab, type PresenceUser } from "../collab";
 import { Users, X } from "lucide-react";
-import { getRoomCode, isRoomOwner, kickFromRoom } from "../api";
+import { getRoomCode, isRoomOwner, kickFromRoom, fetchRoomInfo } from "../api";
 
 /**
  * Shows a small badge listing other people currently in the same room.
@@ -11,16 +11,29 @@ import { getRoomCode, isRoomOwner, kickFromRoom } from "../api";
 export function PresenceBadge() {
   const [users, setUsers] = useState<PresenceUser[]>([]);
   const [open,  setOpen]  = useState(false);
+  const [serverIsOwner, setServerIsOwner] = useState<boolean | null>(null);
 
   useEffect(() => collab.onPresence(setUsers), []);
+
+  const code = getRoomCode();
+  // Server-trusted owner check (survives clearing browser, works across devices
+  // when the user is signed in).
+  useEffect(() => {
+    if (!code) { setServerIsOwner(null); return; }
+    let alive = true;
+    fetchRoomInfo(code).then((info) => {
+      if (alive) setServerIsOwner(info.is_owner);
+    }).catch(() => { /* offline — fall back to localStorage */ });
+    return () => { alive = false; };
+  }, [code]);
 
   // "users" includes the current user. Strip the local sid.
   const ownSid = collab.ownSid();
   const peers  = users.filter((u) => u.sid !== ownSid);
   if (peers.length === 0) return null;
 
-  const code     = getRoomCode();
-  const isOwner  = isRoomOwner(code);
+  // Server has the final word; fall back to localStorage if offline.
+  const isOwner = serverIsOwner ?? isRoomOwner(code);
 
   async function handleKick(sid: string, name: string) {
     if (!code) return;
@@ -36,8 +49,12 @@ export function PresenceBadge() {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-bg-700 border border-bg-600 hover:border-accent"
-        title={`${peers.length} ${peers.length === 1 ? "person" : "people"} editing this room with you`}
+        className={`flex items-center gap-1.5 px-2 py-1 rounded-md bg-bg-700 border ${
+          isOwner ? "border-accent text-accent" : "border-bg-600 hover:border-accent"
+        }`}
+        title={isOwner
+          ? `Host controls — click to see members and kick (${peers.length} ${peers.length === 1 ? "person" : "people"} in room)`
+          : `${peers.length} ${peers.length === 1 ? "person" : "people"} editing this room with you`}
       >
         <Users size={11} className="text-accent" />
         <div className="flex items-center -space-x-1.5">

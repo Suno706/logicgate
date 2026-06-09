@@ -27,10 +27,20 @@ import time
 from contextlib import contextmanager
 from typing import Optional, List, Dict
 
-DB_PATH = os.environ.get(
-    "LOGICGATE_DB",
-    os.path.join(os.path.dirname(__file__), "data", "logicgate.db"),
-)
+# Auto-detect HuggingFace persistent storage at /data — if enabled (paid HF
+# feature), accounts and circuits survive container rebuilds. Otherwise falls
+# back to ./data/ which is wiped each deploy.
+def _default_db_path() -> str:
+    if os.environ.get("LOGICGATE_DB"):
+        return os.environ["LOGICGATE_DB"]
+    # HF Spaces with persistent storage: /data is mounted read-write
+    # across rebuilds. Check for /data writability.
+    if os.path.isdir("/data") and os.access("/data", os.W_OK):
+        return "/data/logicgate.db"
+    return os.path.join(os.path.dirname(__file__), "data", "logicgate.db")
+
+
+DB_PATH = _default_db_path()
 
 
 def _connect() -> sqlite3.Connection:

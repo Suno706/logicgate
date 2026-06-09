@@ -520,13 +520,15 @@ function CurrentRoomBlock(
   { currentRoom, onCopy, onLeave }:
   { currentRoom: string; onCopy: () => void; onLeave: () => void }
 ) {
-  const isOwner = isRoomOwner(currentRoom);
   const [maxUsers, setMaxUsers]   = useState<number>(20);
   const [editing,  setEditing]    = useState<boolean>(false);
   const [pending,  setPending]    = useState<number>(20);
   const [error,    setError]      = useState<string | null>(null);
+  // Trust the server's is_owner — works across devices when signed in,
+  // falls back to localStorage flag when offline.
+  const [serverIsOwner, setServerIsOwner] = useState<boolean | null>(null);
+  const isOwner = serverIsOwner ?? isRoomOwner(currentRoom);
 
-  // Fetch current max-users when the block opens.
   useEffect(() => {
     let alive = true;
     fetch(`/api/rooms/${encodeURIComponent(currentRoom)}`, {
@@ -534,10 +536,12 @@ function CurrentRoomBlock(
     })
       .then((r) => r.json())
       .then((d) => {
-        if (alive && d?.max_users) {
+        if (!alive) return;
+        if (d?.max_users) {
           setMaxUsers(d.max_users);
           setPending(d.max_users);
         }
+        if (typeof d?.is_owner === "boolean") setServerIsOwner(d.is_owner);
       })
       .catch(() => {/* offline — keep default */});
     return () => { alive = false; };
@@ -608,6 +612,12 @@ function CurrentRoomBlock(
           Leave
         </button>
       </div>
+      {isOwner && (
+        <div className="text-[8px] font-mono text-gray-600 pt-1 border-t border-bg-600">
+          👑 You're the host. Click the user-count chip in the top bar to
+          see members and kick someone.
+        </div>
+      )}
     </div>
   );
 }

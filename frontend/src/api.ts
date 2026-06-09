@@ -60,6 +60,25 @@ export function isRoomOwner(code: string | null | undefined): boolean {
   }
 }
 
+/** Server-trusted owner check — survives clearing browser storage and works
+ * across devices when the user is signed in (backend keys by user UID). */
+export async function fetchRoomInfo(code: string): Promise<{
+  exists: boolean;
+  is_owner: boolean;
+  max_users?: number;
+}> {
+  const res = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
+    headers: { "X-Session-Id": getSessionId() },
+  });
+  if (!res.ok) return { exists: false, is_owner: false };
+  const d = await res.json();
+  return {
+    exists: !!d?.exists,
+    is_owner: !!d?.is_owner,
+    max_users: d?.max_users,
+  };
+}
+
 export async function kickFromRoom(code: string, target_sid: string) {
   return postJSON<{ success: boolean; kicked: boolean }>(
     `/api/rooms/${encodeURIComponent(code)}/kick`,

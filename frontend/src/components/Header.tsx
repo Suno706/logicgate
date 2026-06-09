@@ -8,7 +8,9 @@ import type { Tool } from "../types";
 import { useCircuitState, useCircuitDispatch, useCircuitActions } from "../store";
 import { simulate, saveCircuit, listAllCircuits, loadCircuit,
          getSessionId, setRoom, getRoomCode, markRoomOwned,
-         isRoomOwner, saveOwnerToken, getOwnerToken } from "../api";
+         isRoomOwner, saveOwnerToken, getOwnerToken,
+         kickFromRoom } from "../api";
+import { collab } from "../collab";
 import { getDisplayName, signOut } from "./SignInGate";
 import { PresenceBadge } from "./PresenceBadge";
 import { useToast } from "./Toast";
@@ -626,12 +628,64 @@ function CurrentRoomBlock(
           Leave
         </button>
       </div>
-      {isOwner && (
-        <div className="text-[8px] font-mono text-gray-600 pt-1 border-t border-bg-600">
-          👑 You're the host. Click the user-count chip in the top bar to
-          see members and kick someone.
+      {isOwner && <MembersList currentRoom={currentRoom} />}
+    </div>
+  );
+}
+
+
+/** Inline member list shown inside the Room dialog when the caller is the
+ * host. Each peer has a big visible Kick button. */
+function MembersList({ currentRoom }: { currentRoom: string }) {
+  const [users, setUsers] = useState<{ sid: string; name: string; color: string }[]>([]);
+  const [kickingSid, setKickingSid] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => collab.onPresence(setUsers as any), []);
+
+  const ownSid = collab.ownSid();
+  const peers  = users.filter((u) => u.sid !== ownSid);
+
+  async function handleKick(sid: string, name: string) {
+    if (!confirm(`Remove ${name || "this user"} from room ${currentRoom}?`)) return;
+    setKickingSid(sid);
+    setError(null);
+    try {
+      await kickFromRoom(currentRoom, sid);
+    } catch (e) {
+      setError(`Kick failed: ${(e as Error).message}`);
+    } finally {
+      setKickingSid(null);
+    }
+  }
+
+  return (
+    <div className="pt-2 mt-2 border-t border-bg-600 space-y-1.5">
+      <div className="text-[9px] font-mono uppercase tracking-widest text-accent">
+        👑 Host controls — members ({users.length})
+      </div>
+      {peers.length === 0 && (
+        <div className="text-[9px] font-mono text-gray-600 italic">
+          No one else has joined yet. Copy the invite link above.
         </div>
       )}
+      {peers.map((u) => (
+        <div key={u.sid} className="flex items-center gap-2 bg-bg-800 border border-bg-600 rounded px-2 py-1.5">
+          <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
+               style={{ backgroundColor: u.color, color: "#0d0d18" }}>
+            {(u.name || "?")[0].toUpperCase()}
+          </div>
+          <span className="flex-1 text-[10px] font-mono text-gray-200 truncate">{u.name || "guest"}</span>
+          <button
+            onClick={() => handleKick(u.sid, u.name)}
+            disabled={kickingSid === u.sid}
+            className="px-2 py-1 rounded bg-err/15 hover:bg-err/30 text-err text-[9px] font-mono font-semibold border border-err/30 disabled:opacity-40"
+          >
+            {kickingSid === u.sid ? "Kicking…" : "Kick"}
+          </button>
+        </div>
+      ))}
+      {error && <div className="text-[8px] font-mono text-err">{error}</div>}
     </div>
   );
 }

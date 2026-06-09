@@ -1008,37 +1008,41 @@ def _raw_template_t_flipflop():
 
 
 def _raw_template_full_adder_from_half():
-    """Full adder built compositionally from two half-adders + OR:
-       HA1(A,B) -> (S1, C1);  HA2(S1, Cin) -> (Sum, C2);  Cout = C1 | C2"""
+    """Full adder built from two HALF-ADDER MACRO BLOCKS + OR.
+
+    Shows the actual sub-block composition (HA macros visible on canvas)
+    rather than expanding to primitives. Pin layout:
+      HA1: in0=A, in1=B  ->  out0=S1, out1=C1
+      HA2: in0=S1, in1=Cin -> out0=Sum, out1=C2
+      OR(C1, C2) = Cout
+    """
     return {
         'gates': [
-            {'id': 'g1', 'type': 'INPUT',  'label': 'A',   'value': 0, 'x':  80, 'y':  60},
-            {'id': 'g2', 'type': 'INPUT',  'label': 'B',   'value': 0, 'x':  80, 'y': 160},
-            {'id': 'g3', 'type': 'INPUT',  'label': 'Cin', 'value': 0, 'x':  80, 'y': 300},
-            # HA1
-            {'id': 'g4', 'type': 'XOR',                                'x': 260, 'y': 100},  # S1
-            {'id': 'g5', 'type': 'AND',                                'x': 260, 'y': 220},  # C1
-            # HA2
-            {'id': 'g6', 'type': 'XOR',                                'x': 460, 'y': 200},  # Sum
-            {'id': 'g7', 'type': 'AND',                                'x': 460, 'y': 320},  # C2
-            # carry combine
-            {'id': 'g8', 'type': 'OR',                                 'x': 660, 'y': 280},  # Cout
-            {'id': 'g9', 'type': 'OUTPUT','label': 'Sum',              'x': 860, 'y': 200},
-            {'id': 'g10','type': 'OUTPUT','label': 'Cout',             'x': 860, 'y': 280},
+            {'id': 'g1', 'type': 'INPUT',  'label': 'A',   'value': 0, 'x':  80, 'y':  80},
+            {'id': 'g2', 'type': 'INPUT',  'label': 'B',   'value': 0, 'x':  80, 'y': 180},
+            {'id': 'g3', 'type': 'INPUT',  'label': 'Cin', 'value': 0, 'x':  80, 'y': 320},
+            # Half-adder macro #1 (sub-block, NOT expanded)
+            {'id': 'g4', 'type': 'HA',                                  'x': 280, 'y': 130},
+            # Half-adder macro #2 (sub-block, NOT expanded)
+            {'id': 'g5', 'type': 'HA',                                  'x': 500, 'y': 240},
+            # OR to combine the two carries
+            {'id': 'g6', 'type': 'OR',                                  'x': 720, 'y': 340},
+            {'id': 'g7', 'type': 'OUTPUT','label': 'Sum',               'x': 920, 'y': 240},
+            {'id': 'g8', 'type': 'OUTPUT','label': 'Cout',              'x': 920, 'y': 340},
         ],
         'wires': [
-            {'id': 'w1',  'from_gate': 'g1', 'from_pin': 0, 'to_gate': 'g4', 'to_pin': 0},  # A -> XOR1
-            {'id': 'w2',  'from_gate': 'g2', 'from_pin': 0, 'to_gate': 'g4', 'to_pin': 1},  # B -> XOR1
-            {'id': 'w3',  'from_gate': 'g1', 'from_pin': 0, 'to_gate': 'g5', 'to_pin': 0},  # A -> AND1
-            {'id': 'w4',  'from_gate': 'g2', 'from_pin': 0, 'to_gate': 'g5', 'to_pin': 1},  # B -> AND1
-            {'id': 'w5',  'from_gate': 'g4', 'from_pin': 0, 'to_gate': 'g6', 'to_pin': 0},  # S1 -> XOR2
-            {'id': 'w6',  'from_gate': 'g3', 'from_pin': 0, 'to_gate': 'g6', 'to_pin': 1},  # Cin -> XOR2
-            {'id': 'w7',  'from_gate': 'g4', 'from_pin': 0, 'to_gate': 'g7', 'to_pin': 0},  # S1 -> AND2
-            {'id': 'w8',  'from_gate': 'g3', 'from_pin': 0, 'to_gate': 'g7', 'to_pin': 1},  # Cin -> AND2
-            {'id': 'w9',  'from_gate': 'g5', 'from_pin': 0, 'to_gate': 'g8', 'to_pin': 0},  # C1 -> OR
-            {'id': 'w10', 'from_gate': 'g7', 'from_pin': 0, 'to_gate': 'g8', 'to_pin': 1},  # C2 -> OR
-            {'id': 'w11', 'from_gate': 'g6', 'from_pin': 0, 'to_gate': 'g9', 'to_pin': 0},  # Sum out
-            {'id': 'w12', 'from_gate': 'g8', 'from_pin': 0, 'to_gate': 'g10','to_pin': 0},  # Cout
+            # Layer 1: inputs into HA1
+            {'id': 'w1', 'from_gate': 'g1', 'from_pin': 0, 'to_gate': 'g4', 'to_pin': 0},  # A   -> HA1.in0
+            {'id': 'w2', 'from_gate': 'g2', 'from_pin': 0, 'to_gate': 'g4', 'to_pin': 1},  # B   -> HA1.in1
+            # Layer 2: HA1 outputs feed HA2
+            {'id': 'w3', 'from_gate': 'g4', 'from_pin': 0, 'to_gate': 'g5', 'to_pin': 0},  # S1  -> HA2.in0
+            {'id': 'w4', 'from_gate': 'g3', 'from_pin': 0, 'to_gate': 'g5', 'to_pin': 1},  # Cin -> HA2.in1
+            # Carry combine
+            {'id': 'w5', 'from_gate': 'g4', 'from_pin': 1, 'to_gate': 'g6', 'to_pin': 0},  # C1  -> OR.in0
+            {'id': 'w6', 'from_gate': 'g5', 'from_pin': 1, 'to_gate': 'g6', 'to_pin': 1},  # C2  -> OR.in1
+            # Outputs
+            {'id': 'w7', 'from_gate': 'g5', 'from_pin': 0, 'to_gate': 'g7', 'to_pin': 0},  # HA2.S -> Sum
+            {'id': 'w8', 'from_gate': 'g6', 'from_pin': 0, 'to_gate': 'g8', 'to_pin': 0},  # OR    -> Cout
         ],
     }
 

@@ -7,7 +7,8 @@ import {
 import type { Tool } from "../types";
 import { useCircuitState, useCircuitDispatch, useCircuitActions } from "../store";
 import { simulate, saveCircuit, listAllCircuits, loadCircuit,
-         getSessionId, setRoom, getRoomCode, markRoomOwned } from "../api";
+         getSessionId, setRoom, getRoomCode, markRoomOwned,
+         isRoomOwner } from "../api";
 import { getDisplayName, signOut } from "./SignInGate";
 import { PresenceBadge } from "./PresenceBadge";
 import { useToast } from "./Toast";
@@ -487,21 +488,11 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
 
             {/* Current room actions */}
             {currentRoom && (
-              <div className="bg-bg-700/40 border border-bg-600 rounded-lg p-3 space-y-2">
-                <div className="text-[9px] font-mono uppercase tracking-widest text-gray-500">
-                  Currently in room: <span className="text-accent">{currentRoom}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={copyRoomLink}
-                    className="flex-1 py-1.5 rounded bg-accent/15 hover:bg-accent/25 text-accent text-[10px] font-mono font-semibold border border-accent/30">
-                    📋 Copy invite link
-                  </button>
-                  <button onClick={() => { setRoomInput(""); joinRoom(); }}
-                    className="px-3 py-1.5 rounded bg-bg-800 hover:bg-err/20 text-gray-400 hover:text-err text-[10px] font-mono border border-bg-600">
-                    Leave
-                  </button>
-                </div>
-              </div>
+              <CurrentRoomBlock
+                currentRoom={currentRoom}
+                onCopy={copyRoomLink}
+                onLeave={() => { setRoomInput(""); joinRoom(); }}
+              />
             )}
 
             <div className="flex gap-2">
@@ -520,5 +511,103 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
         </div>
       )}
     </>
+  );
+}
+
+
+/* ─── Current-room block: copy link, leave, plus host controls ───────────── */
+function CurrentRoomBlock(
+  { currentRoom, onCopy, onLeave }:
+  { currentRoom: string; onCopy: () => void; onLeave: () => void }
+) {
+  const isOwner = isRoomOwner(currentRoom);
+  const [maxUsers, setMaxUsers]   = useState<number>(20);
+  const [editing,  setEditing]    = useState<boolean>(false);
+  const [pending,  setPending]    = useState<number>(20);
+  const [error,    setError]      = useState<string | null>(null);
+
+  // Fetch current max-users when the block opens.
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/rooms/${encodeURIComponent(currentRoom)}`, {
+      headers: { "X-Session-Id": getSessionId() },
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (alive && d?.max_users) {
+          setMaxUsers(d.max_users);
+          setPending(d.max_users);
+        }
+      })
+      .catch(() => {/* offline — keep default */});
+    return () => { alive = false; };
+  }, [currentRoom]);
+
+  async function saveCap() {
+    if (pending < 2 || pending > 100) {
+      setError("Cap must be between 2 and 100");
+      return;
+    }
+    setError(null);
+    try {
+      const res = await fetch(`/api/rooms/${encodeURIComponent(currentRoom)}/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Session-Id": getSessionId() },
+        body: JSON.stringify({ max_users: pending }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.message || "Update failed");
+        return;
+      }
+      setMaxUsers(pending);
+      setEditing(false);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  return (
+    <div className="bg-bg-700/40 border border-bg-600 rounded-lg p-3 space-y-2">
+      <div className="text-[9px] font-mono uppercase tracking-widest text-gray-500">
+        Currently in room: <span className="text-accent">{currentRoom}</span>
+        {isOwner && <span className="ml-1 text-accent/70">(host)</span>}
+      </div>
+      <div className="text-[9px] font-mono text-gray-500 flex items-center gap-2">
+        <span>Max users:</span>
+        {!editing ? (
+          <>
+            <span className="text-gray-300">{maxUsers}</span>
+            {isOwner && (
+              <button onClick={() => setEditing(true)}
+                className="text-accent/70 hover:text-accent text-[9px] underline">
+                change
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <input type="number" min={2} max={100} value={pending}
+              onChange={(e) => setPending(Math.max(2, Math.min(100, Number(e.target.value) || 2)))}
+              className="w-14 bg-bg-800 border border-bg-600 rounded px-1.5 py-0.5 text-[10px] text-gray-200" />
+            <button onClick={saveCap}
+              className="px-2 py-0.5 rounded bg-accent/25 text-accent text-[9px] hover:bg-accent/40">save</button>
+            <button onClick={() => { setEditing(false); setPending(maxUsers); }}
+              className="px-2 py-0.5 rounded bg-bg-800 text-gray-500 text-[9px] hover:text-gray-300">cancel</button>
+          </>
+        )}
+      </div>
+      {error && <div className="text-[8px] font-mono text-err">{error}</div>}
+      <div className="flex gap-2">
+        <button onClick={onCopy}
+          className="flex-1 py-1.5 rounded bg-accent/15 hover:bg-accent/25 text-accent text-[10px] font-mono font-semibold border border-accent/30">
+          📋 Copy invite link
+        </button>
+        <button onClick={onLeave}
+          className="px-3 py-1.5 rounded bg-bg-800 hover:bg-err/20 text-gray-400 hover:text-err text-[10px] font-mono border border-bg-600">
+          Leave
+        </button>
+      </div>
+    </div>
   );
 }

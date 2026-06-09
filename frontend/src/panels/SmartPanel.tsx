@@ -267,17 +267,34 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
   const [sTemplate, setSTemplate] = useState<string>("half adder");
   const [sExpr,     setSExpr]     = useState<string>("");
   const [sGates,    setSGates]    = useState<string[]>([]);  // empty = mixed
-  // Truth-table state
+  // Truth-table state — tBits[row][col] = output bit (rows × outputs)
   const [tInputs,   setTInputs]   = useState<number>(2);
-  const [tBits,     setTBits]     = useState<(0 | 1)[]>([0, 0, 0, 1]); // default = AND
+  const [tOutputs,  setTOutputs]  = useState<number>(1);
+  const [tBits,     setTBits]     = useState<(0 | 1)[][]>([[0],[0],[0],[1]]); // default = AND
 
   const TEMPLATES = [
+    // ── Gates ──
+    "and gate", "or gate", "not gate", "xor gate", "xnor gate", "nand gate", "nor gate",
+    "buffer", "inverter",
+    // ── Arithmetic ──
     "half adder", "full adder", "full adder using half adder",
-    "2 to 1 mux", "4 to 1 mux", "majority gate",
-    "d flip flop", "sr latch", "jk flip flop", "t flip flop",
-    "decoder 2 to 4", "encoder 4 to 2",
+    "half subtractor", "full subtractor",
     "2 bit adder", "4 bit adder", "8 bit adder",
-    "2 bit comparator", "parity",
+    "2 bit subtractor", "4 bit subtractor",
+    "2 bit comparator", "4 bit comparator",
+    "2 bit multiplier",
+    // ── Combinational ──
+    "2 to 1 mux", "4 to 1 mux", "8 to 1 mux",
+    "1 to 2 demux", "1 to 4 demux", "1 to 8 demux",
+    "2 to 4 decoder", "3 to 8 decoder", "bcd to 7 segment decoder",
+    "4 to 2 encoder", "8 to 3 encoder", "priority encoder valid",
+    "parity", "majority gate",
+    // ── Sequential / latches & flip-flops ──
+    "sr latch", "sr latch nand", "d latch", "gated d latch",
+    "d flip flop", "jk flip flop", "sr flip flop", "t flip flop",
+    "master slave flip flop",
+    // ── Registers / counters ──
+    "4 bit shift register", "4 bit counter",
   ];
   const GATE_OPTIONS = ["NAND", "NOR", "AND", "OR", "NOT", "XOR", "XNOR"];
 
@@ -307,20 +324,38 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     if (sMode === "expr" && sExpr.trim()) {
       q2 = `build ${sExpr.trim()}`;
     } else if (sMode === "truth") {
-      // Convert truth-table bits to an SOP boolean expression that the
-      // backend's boolean parser already understands.
+      // Convert truth-table bits to one SOP boolean expression per output,
+      // then combine into a multi-output build call via the API.
       const names = "ABCDEFGH".slice(0, tInputs).split("");
-      const minterms: string[] = [];
-      for (let i = 0; i < tBits.length; i++) {
-        if (tBits[i] !== 1) continue;
-        const terms = names.map((n, idx) => {
-          const bit = (i >> (tInputs - 1 - idx)) & 1;
-          return bit ? n : "~" + n;
+      const outExprs: { name: string; expr: string }[] = [];
+      for (let c = 0; c < tOutputs; c++) {
+        const minterms: string[] = [];
+        for (let i = 0; i < tBits.length; i++) {
+          if (tBits[i]?.[c] !== 1) continue;
+          const terms = names.map((n, idx) => {
+            const bit = (i >> (tInputs - 1 - idx)) & 1;
+            return bit ? n : "~" + n;
+          });
+          minterms.push("(" + terms.join(" & ") + ")");
+        }
+        const name = `Y${tOutputs > 1 ? c + 1 : ""}`;
+        outExprs.push({
+          name,
+          expr: minterms.length ? minterms.join(" | ") : "0",
         });
-        minterms.push("(" + terms.join(" & ") + ")");
       }
-      if (!minterms.length) { setErr("Truth table has no 1-outputs — nothing to build."); return; }
-      q2 = `build ${minterms.join(" | ")}`;
+      const nonZero = outExprs.filter((o) => o.expr !== "0");
+      if (!nonZero.length) {
+        setErr("Truth table has no 1-outputs — nothing to build.");
+        return;
+      }
+      if (tOutputs === 1) {
+        q2 = `build ${outExprs[0].expr}`;
+      } else {
+        // Multi-output: send as "Y1 = expr1 ; Y2 = expr2 ; ..." — the boolean
+        // parser supports the multi-output syntax already.
+        q2 = "build " + outExprs.map((o) => `${o.name} = ${o.expr}`).join(" ; ");
+      }
     } else {
       q2 = `build ${sTemplate}`;
     }
@@ -331,12 +366,17 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     build(q2);
   }
 
-  function resizeTruthTable(n: number) {
-    setTInputs(n);
-    setTBits(Array(1 << n).fill(0) as (0 | 1)[]);
+  function resizeTruthTable(nInputs: number, nOutputs: number = tOutputs) {
+    setTInputs(nInputs);
+    setTOutputs(nOutputs);
+    setTBits(Array.from({ length: 1 << nInputs }, () =>
+      Array(nOutputs).fill(0) as (0 | 1)[]
+    ));
   }
-  function toggleBit(i: number) {
-    setTBits((prev) => prev.map((b, idx) => (idx === i ? ((b ^ 1) as 0 | 1) : b)));
+  function toggleBit(row: number, col: number) {
+    setTBits((prev) => prev.map((r, i) =>
+      i === row ? r.map((b, j) => (j === col ? ((b ^ 1) as 0 | 1) : b)) : r
+    ));
   }
 
   function toggleGate(g: string) {
@@ -422,44 +462,67 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
 
           {sMode === "truth" && (
             <div className="space-y-1.5">
-              <div className="flex items-center gap-2 text-[9px] font-mono text-gray-500">
+              <div className="flex items-center gap-2 text-[9px] font-mono text-gray-500 flex-wrap">
                 <span>Inputs:</span>
-                {[2, 3, 4].map((n) => (
-                  <button key={n} onClick={() => resizeTruthTable(n)}
-                    className={`px-2 py-0.5 rounded border ${
+                {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  <button key={n} onClick={() => resizeTruthTable(n, tOutputs)}
+                    className={`px-1.5 py-0.5 rounded border ${
                       tInputs === n
                         ? "bg-accent/25 border-accent text-accent"
                         : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500"
                     }`}
                   >{n}</button>
                 ))}
-                <span className="ml-auto">Click Y to toggle</span>
               </div>
-              <div className="bg-bg-800 border border-bg-600 rounded p-1.5 max-h-44 overflow-y-auto">
+              <div className="flex items-center gap-2 text-[9px] font-mono text-gray-500 flex-wrap">
+                <span>Outputs:</span>
+                {[1, 2, 3, 4, 6, 8].map((n) => (
+                  <button key={n} onClick={() => resizeTruthTable(tInputs, n)}
+                    className={`px-1.5 py-0.5 rounded border ${
+                      tOutputs === n
+                        ? "bg-accent/25 border-accent text-accent"
+                        : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500"
+                    }`}
+                  >{n}</button>
+                ))}
+                <span className="ml-auto text-gray-600">click Y to toggle</span>
+              </div>
+              {(1 << tInputs) > 64 && (
+                <div className="text-[8px] font-mono text-amber-400/80">
+                  ⚠ {1 << tInputs} rows — scroll the table. Synthesis may take a few seconds.
+                </div>
+              )}
+              <div className="bg-bg-800 border border-bg-600 rounded p-1.5 max-h-56 overflow-y-auto">
                 <table className="w-full text-[9px] font-mono">
-                  <thead>
+                  <thead className="sticky top-0 bg-bg-800">
                     <tr className="text-gray-600">
                       {"ABCDEFGH".slice(0, tInputs).split("").map((n) => (
                         <th key={n} className="px-1 text-center">{n}</th>
                       ))}
-                      <th className="px-1 text-center text-accent">Y</th>
+                      {Array.from({ length: tOutputs }).map((_, c) => (
+                        <th key={c} className="px-1 text-center text-accent">
+                          Y{tOutputs > 1 ? c + 1 : ""}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {tBits.map((b, i) => (
+                    {tBits.map((row, i) => (
                       <tr key={i} className="hover:bg-bg-700/40">
-                        {Array.from({length: tInputs}).map((_, k) => (
+                        {Array.from({ length: tInputs }).map((_, k) => (
                           <td key={k} className="px-1 text-center text-gray-500">
                             {(i >> (tInputs - 1 - k)) & 1}
                           </td>
                         ))}
-                        <td className="px-1 text-center">
-                          <button onClick={() => toggleBit(i)}
-                            className={`w-5 h-4 rounded font-bold ${
-                              b ? "bg-accent/25 text-accent" : "bg-bg-700 text-gray-600 hover:text-gray-300"
-                            }`}
-                          >{b}</button>
-                        </td>
+                        {row.map((b, c) => (
+                          <td key={c} className="px-1 text-center">
+                            <button onClick={() => toggleBit(i, c)}
+                              className={`w-5 h-4 rounded font-bold ${
+                                b ? "bg-accent/25 text-accent" : "bg-bg-700 text-gray-600 hover:text-gray-300"
+                              }`}
+                            >{b}</button>
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>

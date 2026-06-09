@@ -71,18 +71,38 @@ app.register_blueprint(auth_bp)
 # Real-time collaboration via WebSocket
 socketio = init_socketio(app)
 
-print("Loading ML models...")
-fault_detector       = FaultDetector()
-circuit_optimizer    = CircuitOptimizer()
-gate_minimizer       = GateMinimizer()
-boolean_synth        = BooleanSynthesizer()
-connection_suggester = ConnectionSuggester()
-question_solver      = QuestionSolver(
-    fault_detector=fault_detector,
-    gate_minimizer=gate_minimizer,
-    boolean_synth=boolean_synth,
-)
-print("All ML models ready.")
+# ML models are heavy on first boot (training from CSV can take 1-3 min on
+# slow free-tier CPUs). To keep Render's port-bind health check happy we
+# initialize lazily: stubs first, then a background thread swaps in the real
+# objects. ML routes return 503 until training finishes.
+import threading
+
+fault_detector       = None
+circuit_optimizer    = None
+gate_minimizer       = None
+boolean_synth        = None
+connection_suggester = None
+question_solver      = None
+_ml_ready            = False
+
+def _load_ml_models():
+    global fault_detector, circuit_optimizer, gate_minimizer
+    global boolean_synth, connection_suggester, question_solver, _ml_ready
+    print("Loading ML models in background...")
+    fault_detector       = FaultDetector()
+    circuit_optimizer    = CircuitOptimizer()
+    gate_minimizer       = GateMinimizer()
+    boolean_synth        = BooleanSynthesizer()
+    connection_suggester = ConnectionSuggester()
+    question_solver      = QuestionSolver(
+        fault_detector=fault_detector,
+        gate_minimizer=gate_minimizer,
+        boolean_synth=boolean_synth,
+    )
+    _ml_ready = True
+    print("All ML models ready.")
+
+threading.Thread(target=_load_ml_models, daemon=True).start()
 
 CIRCUITS_DIR = 'circuits'
 os.makedirs(CIRCUITS_DIR, exist_ok=True)
@@ -135,6 +155,16 @@ def _err(message, code=400, exc=None):
     if exc is not None:
         traceback.print_exc()
     return jsonify({'status': 'error', 'success': False, 'message': str(message)}), code
+
+
+def _ml_guard():
+    """Return a 503 response if ML models haven't finished loading yet."""
+    if not _ml_ready:
+        return jsonify({
+            'status': 'warming_up',
+            'message': 'ML models are still loading on first boot. Try again in ~30 seconds.',
+        }), 503
+    return None
 
 
 # -- UI -------------------------------------------------------------------------
@@ -266,14 +296,15 @@ def room_info(code):
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({
-        'status':   'online', 'version': '3.1',
-        'features': ['fault_detection', 'optimization', 'gate_minimization',
-                     'question_solver', 'boolean_synth', 'connection_suggester'],
+        'status':    'online', 'version': '3.1',
+        'ml_ready':  _ml_ready,
+        'features':  ['fault_detection', 'optimization', 'gate_minimization',
+                      'question_solver', 'boolean_synth', 'connection_suggester'],
         'models': {
-            'fault_detector':       fault_detector.model is not None,
-            'circuit_optimizer':    circuit_optimizer.model is not None,
-            'gate_minimizer':       gate_minimizer.model is not None,
-            'connection_suggester': connection_suggester.is_ready(),
+            'fault_detector':       bool(fault_detector and fault_detector.model is not None),
+            'circuit_optimizer':    bool(circuit_optimizer and circuit_optimizer.model is not None),
+            'gate_minimizer':       bool(gate_minimizer and gate_minimizer.model is not None),
+            'connection_suggester': bool(connection_suggester and connection_suggester.is_ready()),
         }
     })
 
@@ -282,6 +313,7 @@ def health():
 
 @app.route('/api/analyze/faults', methods=['POST'])
 def analyze_faults():
+    if (r := _ml_guard()): return r
     try:
         circuit = (request.get_json(silent=True) or {}).get('circuit', {})
         faults  = fault_detector.detect_faults(circuit)
@@ -296,6 +328,7 @@ def analyze_faults():
 
 @app.route('/api/analyze/optimize', methods=['POST'])
 def analyze_optimize():
+    if (r := _ml_guard()): return r
     try:
         circuit  = (request.get_json(silent=True) or {}).get('circuit', {})
         analysis = circuit_optimizer.analyze_circuit(circuit)
@@ -311,6 +344,7 @@ def analyze_optimize():
 
 @app.route('/api/analyze/minimize', methods=['POST'])
 def analyze_minimize():
+    if (r := _ml_guard()): return r
     try:
         data       = request.get_json(silent=True) or {}
         circuit    = data.get('circuit', {})
@@ -339,6 +373,7 @@ def analyze_minimize():
 
 @app.route('/api/ask', methods=['POST'])
 def ask_question():
+    if (r := _ml_guard()): return r
     try:
         data     = request.get_json(silent=True) or {}
         question = data.get('question', '')
@@ -510,6 +545,7 @@ def trigger_retrain():
 @app.route('/api/predict', methods=['POST'])
 def predict_output():
     """Directly predict circuit output using ML model."""
+    if (r := _ml_guard()): return r
     try:
         circuit = (request.get_json(silent=True) or {}).get('circuit', {})
         row     = fault_detector._circuit_to_row(circuit)
@@ -533,6 +569,7 @@ def predict_output():
 
 @app.route('/api/analyze/full', methods=['POST'])
 def analyze_full():
+    if (r := _ml_guard()): return r
     try:
         data    = request.get_json(silent=True) or {}
         circuit = data.get('circuit', {})
@@ -582,6 +619,7 @@ def build_boolean():
     Body: {expression: 'A & B | ~C', target_gates?: ['NAND'], name?: 'expr'}
     Returns the gate/wire JSON the frontend can render directly.
     """
+    if (r := _ml_guard()): return r
     try:
         data = request.get_json(silent=True) or {}
         expr = (data.get('expression') or '').strip()
@@ -609,6 +647,7 @@ def build_question():
     Body: {question: 'build a half adder' / 'A xor B' / 'XOR using NAND'}
     Returns gate JSON if interpretable, otherwise a textual answer.
     """
+    if (r := _ml_guard()): return r
     try:
         data     = request.get_json(silent=True) or {}
         question = (data.get('question') or '').strip()
@@ -628,6 +667,7 @@ def synthesize():
     """
     Body: {expression: '...', allowed_gates: ['NAND'] | ['NOR'] | ['AND','OR','NOT']}
     """
+    if (r := _ml_guard()): return r
     try:
         data    = request.get_json(silent=True) or {}
         expr    = (data.get('expression') or '').strip()
@@ -653,6 +693,7 @@ def suggest_connection():
     Body: {circuit: {gates,wires}, top_k?: 5}
     Returns ranked candidate wires the ML thinks should be added.
     """
+    if (r := _ml_guard()): return r
     try:
         data    = request.get_json(silent=True) or {}
         circuit = data.get('circuit', {})

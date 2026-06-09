@@ -102,7 +102,12 @@ def _load_ml_models():
     _ml_ready = True
     print("All ML models ready.")
 
-threading.Thread(target=_load_ml_models, daemon=True).start()
+import sys
+if "pytest" in sys.modules or os.environ.get("LOGICGATE_SYNC_ML") == "1":
+    # In tests we want deterministic state, not "warming up" 503s.
+    _load_ml_models()
+else:
+    threading.Thread(target=_load_ml_models, daemon=True).start()
 
 CIRCUITS_DIR = 'circuits'
 os.makedirs(CIRCUITS_DIR, exist_ok=True)
@@ -270,11 +275,13 @@ def list_short():
 
 @app.route('/api/rooms/new', methods=['POST'])
 def room_new():
-    """Auto-generate a 6-character room code that's easy to share."""
+    """Auto-generate a 6-character room code. Caller becomes the room owner
+    (their session_id is stored as created_by) so they can kick other users."""
     try:
-        code = db.generate_room_code()
+        sid = _session_id()
+        code = db.generate_room_code(owner_session=sid)
         return jsonify({'success': True, 'code': code,
-                        'url': f'/?room={code}'})
+                        'url': f'/?room={code}', 'is_owner': True})
     except Exception as e:
         return _err(e, exc=e)
 
@@ -286,7 +293,31 @@ def room_info(code):
         info = db.get_room(code)
         if not info:
             return jsonify({'exists': False, 'code': code})
-        return jsonify({'exists': True, **info})
+        owner = db.get_room_owner(code)
+        is_owner = bool(owner) and owner == _session_id()
+        return jsonify({'exists': True, 'is_owner': is_owner, **info})
+    except Exception as e:
+        return _err(e, exc=e)
+
+
+@app.route('/api/rooms/<code>/kick', methods=['POST'])
+def room_kick(code):
+    """Owner-only: kick a user from the room by their socket id.
+    Body: {target_sid: '<sid>'}"""
+    try:
+        code = ''.join(c for c in code.upper() if c.isalnum())[:12]
+        data = request.get_json(silent=True) or {}
+        target_sid = (data.get('target_sid') or '').strip()
+        if not target_sid:
+            return _err('Missing target_sid', 400)
+        owner = db.get_room_owner(code)
+        if not owner:
+            return _err('Room has no owner — cannot kick.', 403)
+        if owner != _session_id():
+            return _err('Only the room owner can kick users.', 403)
+        from realtime import kick_socket
+        ok = kick_socket(code, target_sid)
+        return jsonify({'success': True, 'kicked': ok, 'target_sid': target_sid})
     except Exception as e:
         return _err(e, exc=e)
 

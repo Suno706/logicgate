@@ -35,12 +35,15 @@ export interface PresenceUser {
 
 type RemoteHandler   = (op: RemoteOp & { from: string }) => void;
 type PresenceHandler = (users: PresenceUser[]) => void;
+type KickedHandler   = (info: { room: string; reason: string }) => void;
 
 class CollabClient {
   private socket: Socket | null = null;
   private remoteHandlers:   Set<RemoteHandler>   = new Set();
   private presenceHandlers: Set<PresenceHandler> = new Set();
+  private kickedHandlers:   Set<KickedHandler>   = new Set();
   private currentRoom: string | null = null;
+  private mySid: string | null = null;
   /** Suppress broadcast for the next applied op — used when re-applying a
    *  remote op locally so it doesn't bounce back to the peer. */
   private suppress = false;
@@ -64,7 +67,12 @@ class CollabClient {
     });
 
     s.on("connect", () => {
+      this.mySid = s.id || null;
       s.emit("join", { room, name });
+    });
+
+    s.on("kicked", (info: { room: string; reason: string }) => {
+      this.kickedHandlers.forEach((h) => h(info));
     });
 
     s.on("presence", (data: { users: PresenceUser[] }) => {
@@ -99,6 +107,7 @@ class CollabClient {
       this.socket = null;
     }
     this.currentRoom = null;
+    this.mySid = null;
     this.presenceHandlers.forEach((h) => h([]));
   }
 
@@ -119,12 +128,22 @@ class CollabClient {
     return () => { this.presenceHandlers.delete(h); };
   }
 
+  onKicked(h: KickedHandler): () => void {
+    this.kickedHandlers.add(h);
+    return () => { this.kickedHandlers.delete(h); };
+  }
+
   isConnected() {
     return !!this.socket?.connected;
   }
 
   currentRoomName() {
     return this.currentRoom;
+  }
+
+  /** Socket ID of *this* client. null until the connect handshake finishes. */
+  ownSid(): string | null {
+    return this.mySid;
   }
 }
 

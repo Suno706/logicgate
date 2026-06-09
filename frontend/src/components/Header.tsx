@@ -7,7 +7,7 @@ import {
 import type { Tool } from "../types";
 import { useCircuitState, useCircuitDispatch, useCircuitActions } from "../store";
 import { simulate, saveCircuit, listAllCircuits, loadCircuit,
-         getSessionId, setRoom, getRoomCode } from "../api";
+         getSessionId, setRoom, getRoomCode, markRoomOwned } from "../api";
 import { getDisplayName, signOut } from "./SignInGate";
 import { PresenceBadge } from "./PresenceBadge";
 import { useToast } from "./Toast";
@@ -166,10 +166,15 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
 
   async function createNewRoom() {
     try {
-      const res = await fetch("/api/rooms/new", { method: "POST" });
+      const res = await fetch("/api/rooms/new", {
+        method: "POST",
+        headers: { "X-Session-Id": getSessionId() },
+      });
       const data = await res.json();
       if (data.code) {
         setRoomInput(data.code);
+        // Remember owner status so the kick button shows on next reload.
+        markRoomOwned(data.code);
         // Auto-join the new room and update the URL so it's shareable.
         setRoom(data.code);
         setCurrentRoom(data.code);

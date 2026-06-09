@@ -36,7 +36,10 @@ _GATE_TOKEN_MAP = {
     'xnor': 'XNOR',
 }
 _GATE_TOKEN_RE = (
-    r'(?:nand|nor|xnor|xor|inverter|inv|and|or|not)'
+    # Optional trailing " gate" / " gates" so "AND gate", "NOT gates" are
+    # parsed as the gate token itself (not "AND" + filler word "gate"). Lets
+    # phrases like "using not gate and gate" extract both NOT and AND.
+    r'(?:nand|nor|xnor|xor|inverter|inv|and|or|not)(?:\s+gates?)?'
 )
 # A gate-list is one or more gate tokens joined by separators (and / , / / / +).
 _GATE_LIST_RE = (
@@ -65,39 +68,63 @@ def _parse_target(text: str):
     Pull out a gate-set restriction phrase from `text`. Returns
     (target_list_or_None, text_with_phrase_stripped).
     """
+    # First: collect *explicit* "X gate(s)" mentions anywhere in the text.
+    # "build flipflop using not gate and gate both" → finds NOT + AND.
+    # This is unambiguous because " gate" forces the gate-name reading
+    # (vs "and" being a list separator).
+    seen, explicit = set(), []
+    for m_exp in re.finditer(
+            r'\b(nand|nor|xnor|xor|inverter|inv|and|or|not)\s+gates?\b',
+            text, re.IGNORECASE):
+        g = _GATE_TOKEN_MAP.get(m_exp.group(1).lower())
+        if g and g not in seen:
+            seen.add(g)
+            explicit.append(g)
+
     m = _RESTRICTION_PREFIX_RE.search(text)
     if not m:
         m = _RESTRICTION_SUFFIX_RE.search(text)
-    if not m:
-        return None, text
 
-    phrase = m.group(0).lower()
-    if 'aoi' in phrase or 'and-or-not' in phrase:
-        target = ['AND', 'OR', 'NOT']
-    else:
-        tokens = re.findall(_GATE_TOKEN_RE, phrase, flags=re.IGNORECASE)
-        # "and" / "or" can be either a gate name OR a list separator. When
-        # they sit between two other gate tokens ("NAND and NOT", "OR and
-        # NOT") they're a separator  -  drop them. Only at the start/end of
-        # the token list do we treat them as actual gates.
-        filtered = []
-        for i, tok in enumerate(tokens):
-            if (tok.lower() in ('and', 'or')
-                    and 0 < i < len(tokens) - 1):
-                continue
-            filtered.append(tok)
-        # Dedupe while preserving order.
-        seen, target = set(), []
-        for tok in filtered:
-            g = _GATE_TOKEN_MAP[tok.lower()]
-            if g not in seen:
-                seen.add(g)
-                target.append(g)
-        if not target:
-            return None, text
+    if m:
+        phrase_orig = m.group(0)            # original case for heuristics
+        phrase = phrase_orig.lower()
+        if 'aoi' in phrase or 'and-or-not' in phrase:
+            for g in ('AND', 'OR', 'NOT'):
+                if g not in seen:
+                    seen.add(g)
+                    explicit.append(g)
+        else:
+            tokens = re.findall(_GATE_TOKEN_RE, phrase_orig, flags=re.IGNORECASE)
+            # "and" / "or" can be either a gate name OR a list separator.
+            # Heuristic: if written in UPPERCASE the user means the gate;
+            # lowercase between two gates is a separator. Edge: if dropping
+            # middle "and"/"or" would shrink the target list to nothing,
+            # keep it.
+            filtered = []
+            for i, tok in enumerate(tokens):
+                low = tok.lower().strip()
+                # Strip trailing " gate(s)" before classifying.
+                bare = re.sub(r'\s+gates?$', '', low).strip()
+                if (bare in ('and', 'or')
+                        and 0 < i < len(tokens) - 1
+                        and not tok.isupper()
+                        and ' gate' not in low):
+                    continue   # separator
+                filtered.append(tok)
+            for tok in filtered:
+                key = re.sub(r'\s+gates?$', '', tok.lower()).strip()
+                g = _GATE_TOKEN_MAP.get(key)
+                if g and g not in seen:
+                    seen.add(g)
+                    explicit.append(g)
+        stripped = text[:m.start()] + text[m.end():]
+        return (explicit or None), stripped.strip()
 
-    stripped = text[:m.start()] + text[m.end():]
-    return target, stripped.strip()
+    # No explicit prefix/suffix. If the text mentions gates as "X gate" AND
+    # a using/with-style introducer exists, treat it as a restriction.
+    if explicit and re.search(r'\b(?:using|with|via|from|by)\b', text, re.I):
+        return explicit, text
+    return None, text
 
 KNOWN_CIRCUITS = {
     # canonical_name -> boolean expression (one output)
@@ -468,6 +495,24 @@ _ALIAS_RULES = [
     (r'\bbuld\b',             'build'),
     (r'\bbiuid\b',            'build'),
     (r'\bbuiild\b',           'build'),
+    (r'\bbbuild\b',           'build'),
+    (r'\bbuilld\b',           'build'),
+    (r'\bbuilt\b',            'build'),
+    (r'\bmaek\b',             'make'),
+    (r'\bcrete\b',            'create'),
+    (r'\bdsign\b',            'design'),
+    (r'\bflp\s*flop\b',       'flip flop'),
+    (r'\bflipflop\b',         'flip flop'),
+    (r'\bflip\s*-\s*flop\b',  'flip flop'),
+    (r'\bff\b',               'flip flop'),
+    (r'\bd\s*ff\b',           'd flip flop'),
+    (r'\bsr\s*ff\b',          'sr flip flop'),
+    (r'\bjk\s*ff\b',          'jk flip flop'),
+    (r'\bt\s*ff\b',           't flip flop'),
+    # Conversational gate-set phrasings that the restriction regex misses.
+    (r'\busing\s+both\b',                            'using'),
+    (r'\busing\s+(\w+)\s+and\s+(\w+)\s+both\b',      r'using \1 and \2'),
+    (r'\bwith\s+both\s+(\w+)\s+and\s+(\w+)\b',       r'using \1 and \2'),
     (r'\bmultipxer\b',        'multiplexer'),
     (r'\bmultipler\b',        'multiplexer'),
     (r'\bmlutiplexer\b',      'multiplexer'),
@@ -2374,7 +2419,11 @@ class QuestionSolver:
             r'\bwhen\s+(?:all|any|every|exactly|at\s+least|at\s+most|some)\b.*\b(?:then|gives?|outputs?|=)\b',
             question_lower))
 
-        if not is_build_request and not is_behaviour_spec:
+        # Gate-set restriction ("full adder using NAND", "XOR with NOR only")
+        # is a strong build signal even without a leading "build" verb.
+        has_restriction = _parse_target(question)[0] is not None
+
+        if not is_build_request and not is_behaviour_spec and not has_restriction:
             kb = self._try_knowledge_base(question_lower)
             if kb is not None:
                 kb.setdefault('intent', 'concept')

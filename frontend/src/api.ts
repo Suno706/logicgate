@@ -39,6 +39,34 @@ export function getRoomCode(): string | null {
   return s.startsWith("room_") ? s.slice(5) : null;
 }
 
+/** Remember that this browser created the named room — it can kick others. */
+export function markRoomOwned(code: string): void {
+  try {
+    const owned = JSON.parse(localStorage.getItem("logicgate.owned_rooms") || "[]");
+    if (!owned.includes(code)) {
+      owned.push(code);
+      localStorage.setItem("logicgate.owned_rooms", JSON.stringify(owned));
+    }
+  } catch { /* localStorage unavailable */ }
+}
+
+export function isRoomOwner(code: string | null | undefined): boolean {
+  if (!code) return false;
+  try {
+    const owned = JSON.parse(localStorage.getItem("logicgate.owned_rooms") || "[]");
+    return Array.isArray(owned) && owned.includes(code.toUpperCase());
+  } catch {
+    return false;
+  }
+}
+
+export async function kickFromRoom(code: string, target_sid: string) {
+  return postJSON<{ success: boolean; kicked: boolean }>(
+    `/api/rooms/${encodeURIComponent(code)}/kick`,
+    { target_sid }
+  );
+}
+
 function authHeaders(): Record<string, string> {
   return { "X-Session-Id": getSessionId() };
 }

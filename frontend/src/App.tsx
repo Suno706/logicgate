@@ -76,8 +76,17 @@ export default function App() {
       }
     }
     window.addEventListener("storage", onStorage);
+    // If the host kicks us, jump back to a private session.
+    const offKicked = collab.onKicked((info) => {
+      alert(`You were removed from room ${info.room}.\n${info.reason || ""}`);
+      try { localStorage.removeItem("logicgate.session_id"); } catch { /* */ }
+      const url = new URL(window.location.href);
+      url.searchParams.delete("room");
+      window.location.href = url.toString();
+    });
     return () => {
       window.removeEventListener("storage", onStorage);
+      offKicked();
       collab.disconnect();
     };
   }, []);

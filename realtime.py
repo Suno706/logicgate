@@ -44,6 +44,8 @@ log = logging.getLogger("logicgate.realtime")
 _rosters: Dict[str, List[dict]] = defaultdict(list)
 # sid -> room (so disconnect knows which room to remove from)
 _sid_room: Dict[str, str] = {}
+# Module-level handle to the live SocketIO instance, used by kick_socket().
+_socketio = None
 
 # A small palette of distinct colors so each user gets a unique cursor color.
 _COLORS = [
@@ -68,18 +70,50 @@ def _broadcast_presence(room: str):
     emit("presence", {"users": users}, to=room)
 
 
+def kick_socket(room: str, target_sid: str) -> bool:
+    """Force-disconnect a user from a room. Used by the kick API endpoint.
+    Emits a 'kicked' event to the target so the client can show a message,
+    then drops them from the roster and forces a transport disconnect.
+    Returns True if the target was found in the room."""
+    if _socketio is None:
+        return False
+    if _sid_room.get(target_sid) != room:
+        return False
+    try:
+        _socketio.emit("kicked", {"room": room, "reason": "Removed by host"},
+                       to=target_sid, namespace="/collab")
+    except Exception:
+        pass
+    _rosters[room] = [u for u in _rosters[room] if u["sid"] != target_sid]
+    _sid_room.pop(target_sid, None)
+    try:
+        _socketio.server.disconnect(target_sid, namespace="/collab")
+    except Exception:
+        pass
+    # Tell the rest of the room someone left
+    try:
+        users = [{"sid": u["sid"], "name": u["name"], "color": u["color"]}
+                 for u in _rosters[room]]
+        _socketio.emit("presence", {"users": users}, to=room, namespace="/collab")
+    except Exception:
+        pass
+    return True
+
+
 def init_socketio(app, cors_allowed_origins="*") -> SocketIO:
     """
     Attach Socket.IO to the existing Flask app and register the collaboration
     namespace ('/collab'). Returns the SocketIO instance — caller is responsible
     for using socketio.run(app) instead of app.run().
     """
+    global _socketio
     socketio = SocketIO(
         app,
         cors_allowed_origins=cors_allowed_origins,
         async_mode="threading",      # works without eventlet/gevent in dev
         logger=False, engineio_logger=False,
     )
+    _socketio = socketio
 
     @socketio.on("connect", namespace="/collab")
     def _on_connect():

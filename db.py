@@ -80,12 +80,13 @@ def _init_schema(conn: sqlite3.Connection):
 
         CREATE TABLE IF NOT EXISTS rooms (
             code          TEXT PRIMARY KEY,
-            created_by    INTEGER,
+            created_by    TEXT,
             created_at    REAL NOT NULL,
-            last_used_at  REAL NOT NULL,
-            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+            last_used_at  REAL NOT NULL
         );
     """)
+    # SQLite type affinity is lenient — if an older DB had created_by as
+    # INTEGER, we can still write TEXT values into it. No migration needed.
     conn.commit()
 
 
@@ -207,8 +208,10 @@ _ROOM_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 import secrets   # noqa: E402
 
 
-def generate_room_code(length: int = 6) -> str:
-    """Generate a unique 6-character room code, avoiding ambiguous chars."""
+def generate_room_code(length: int = 6, owner_session: str = None) -> str:
+    """Generate a unique room code. owner_session: caller's session_id, stored
+    as text so guests (s_xxx) AND signed-in users (u_xxx_yyy / g_xxx) can own
+    a room and kick others."""
     for _ in range(20):
         code = "".join(secrets.choice(_ROOM_ALPHABET) for _ in range(length))
         with cursor() as cur:
@@ -219,10 +222,19 @@ def generate_room_code(length: int = 6) -> str:
                 cur.execute(
                     "INSERT INTO rooms (code, created_by, created_at, last_used_at) "
                     "VALUES (?, ?, ?, ?)",
-                    (code, None, time.time(), time.time()),
+                    (code, owner_session, time.time(), time.time()),
                 )
                 return code
     raise RuntimeError("Could not generate unique room code")
+
+
+def get_room_owner(code: str) -> Optional[str]:
+    """Returns the session_id of the room creator, or None if room is open."""
+    with cursor() as cur:
+        row = cur.execute(
+            "SELECT created_by FROM rooms WHERE code = ?", (code,)
+        ).fetchone()
+        return row["created_by"] if row else None
 
 
 def touch_room(code: str) -> bool:

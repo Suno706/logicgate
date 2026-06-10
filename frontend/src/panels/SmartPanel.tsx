@@ -995,37 +995,89 @@ function BuildTab({ circuit, dispatch }: { circuit?: any; dispatch: any }) {
             )}
           </div>
 
-          {/* Insert block: drops a macro + INPUT/OUTPUT/CLK around it,
-              pre-wired so the user can press RUN and see it simulate. */}
+          {/* Insert block: each click drops the natural COMPOSITION using
+              that block (e.g. 'Half adder' → 2 HAs + OR = full adder),
+              not just one isolated piece. Mapping: clickable label →
+              backend template name that returns the composed circuit. */}
           <div>
             <label className="text-[9px] font-mono text-gray-500 block mb-1">
-              Insert block (drops a working block with IO already wired)
+              Insert block (drops the natural composition built from this block)
             </label>
             <div className="flex flex-wrap gap-1">
               {[
-                ["HA",     "Half adder", { in: ["A","B"],           out: ["Sum","Cout"]   }],
-                ["FA",     "Full adder", { in: ["A","B","Cin"],     out: ["Sum","Cout"]   }],
-                ["MUX2",   "2:1 MUX",    { in: ["A","B","Sel"],     out: ["Y"]            }],
-                ["MUX4",   "4:1 MUX",    { in: ["D0","D1","D2","D3","S0","S1"], out: ["Y"] }],
-                ["DEC24",  "2:4 Dec",    { in: ["A","B"],           out: ["Y0","Y1","Y2","Y3"] }],
-                ["DEC38",  "3:8 Dec",    { in: ["A","B","C"],       out: ["Y0","Y1","Y2","Y3","Y4","Y5","Y6","Y7"] }],
-                ["ENC42",  "4:2 Enc",    { in: ["I0","I1","I2","I3"], out: ["Y0","Y1"] }],
-                ["DFF",    "D-FF",       { in: ["D"],   clk: true,  out: ["Q","Qbar"] }],
-                ["JKFF",   "JK-FF",      { in: ["J","K"], clk: true, out: ["Q","Qbar"] }],
-                ["TFF",    "T-FF",       { in: ["T"],   clk: true,  out: ["Q","Qbar"] }],
-                ["SRLATCH","SR Latch",   { in: ["S","R"],           out: ["Q","Qbar"] }],
-                ["REG4",   "4-bit Reg",  { in: ["D0","D1","D2","D3"], clk: true, out: ["Q0","Q1","Q2","Q3"] }],
-                ["CMP2",   "2-bit cmp",  { in: ["A0","A1","B0","B1"], out: ["LT","EQ","GT"] }],
-              ].map(([type, label, layout]) => (
+                // [button label, hover hint, backend template name, optional single-block fallback layout]
+                ["Half adder → Full adder (2 HA + OR)",
+                  "Drops the full-adder composition: 2 half-adders + OR gate, all wired",
+                  "full adder using half adder", null],
+                ["Full adder → 4-bit adder (4 FA)",
+                  "Drops 4 full-adders chained as a 4-bit ripple-carry adder",
+                  "4 bit adder using full adder", null],
+                ["Full adder → 4-bit subtractor",
+                  "Drops a 4-bit subtractor (A − B) built from 4 full-adders + inverters",
+                  "4 bit subtractor using full adder", null],
+                ["D-FF → 4-bit register",
+                  "Drops 4 D flip-flops sharing one CLK as a 4-bit parallel register",
+                  "4 bit register using d flip flop", null],
+                ["D-FF → 4-bit shift register",
+                  "Drops 4 D flip-flops chained as a serial-in / parallel-out shift register",
+                  "4 bit shift register using d flip flop", null],
+                ["D-FF → 4-bit ring counter",
+                  "Drops 4 D flip-flops in a ring (last Q wraps back to first D)",
+                  "ring counter using d flip flop", null],
+                ["T-FF → 4-bit counter",
+                  "Drops 4 T flip-flops cascaded as a ripple counter mod-16",
+                  "4 bit counter using t flip flop", null],
+                ["2:1 MUX → 4:1 MUX (3 MUX2)",
+                  "Drops 3 two-to-one muxes wired as a four-to-one multiplexer",
+                  "4 to 1 mux using 2 to 1 mux", null],
+                // Single-block fallbacks (no natural composition — drop one with IO)
+                ["JK-FF (single block)",
+                  "Drops one JK flip-flop with J, K, CLK inputs and Q, Q̅ outputs wired",
+                  null,
+                  { type: "JKFF",   in: ["J","K"], clk: true, out: ["Q","Qbar"] }],
+                ["SR Latch (single block)",
+                  "Drops one SR latch (S, R → Q, Q̅) wired",
+                  null,
+                  { type: "SRLATCH",in: ["S","R"],            out: ["Q","Qbar"] }],
+                ["2:4 Decoder (single block)",
+                  "Drops one 2-to-4 decoder with A, B in and Y0..Y3 out",
+                  null,
+                  { type: "DEC24",  in: ["A","B"],            out: ["Y0","Y1","Y2","Y3"] }],
+                ["3:8 Decoder (single block)",
+                  "Drops one 3-to-8 decoder",
+                  null,
+                  { type: "DEC38",  in: ["A","B","C"],        out: ["Y0","Y1","Y2","Y3","Y4","Y5","Y6","Y7"] }],
+                ["4:2 Encoder (single block)",
+                  "Drops one 4-to-2 priority encoder",
+                  null,
+                  { type: "ENC42",  in: ["I0","I1","I2","I3"], out: ["Y0","Y1"] }],
+                ["2-bit comparator (single block)",
+                  "Drops one 2-bit comparator (A1A0 vs B1B0 → LT/EQ/GT)",
+                  null,
+                  { type: "CMP2",   in: ["A0","A1","B0","B1"], out: ["LT","EQ","GT"] }],
+              ].map(([label, hint, templateName, fallback]) => (
                 <button
-                  key={type as string}
-                  title={`Drop a working ${label} block (with INPUT/OUTPUT wired)`}
-                  onClick={() => insertWorkingMacro(type as string, layout as any)}
-                  className="px-2 py-0.5 rounded text-[9px] font-mono border bg-bg-800 border-bg-600 text-gray-400 hover:border-accent hover:text-accent transition-all"
+                  key={label as string}
+                  title={hint as string}
+                  onClick={async () => {
+                    if (templateName) {
+                      // Compositional: ask backend to build the named recipe
+                      // (e.g. "full adder using half adder" → 2 HAs + OR).
+                      await build(`build ${templateName}`);
+                    } else if (fallback) {
+                      const fb = fallback as any;
+                      insertWorkingMacro(fb.type, { in: fb.in, out: fb.out, clk: fb.clk });
+                    }
+                  }}
+                  className="px-2 py-1 rounded text-[9px] font-mono border bg-bg-800 border-bg-600 text-gray-400 hover:border-accent hover:text-accent transition-all"
                 >
                   {label as string}
                 </button>
               ))}
+            </div>
+            <div className="text-[8px] font-mono text-gray-600 mt-1">
+              Composition buttons replace the canvas with the built circuit;
+              single-block buttons append one wired block.
             </div>
           </div>
 

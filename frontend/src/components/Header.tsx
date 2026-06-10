@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import {
   MousePointer2, Spline, Hand, Undo2, Redo2, Trash2, Square,
   Grid3x3, Play, StopCircle, Save, FolderOpen, Wifi, WifiOff,
-  Loader2, X, Maximize2, Users, BookOpen,
+  Loader2, X, Maximize2, Users, BookOpen, Sun, Moon,
 } from "lucide-react";
+import { getTheme, toggleTheme } from "../theme";
 import type { Tool } from "../types";
 import { useCircuitState, useCircuitDispatch, useCircuitActions } from "../store";
 import { simulate, saveCircuit, listAllCircuits, loadCircuit,
@@ -321,6 +322,9 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
           {backendOk === false && <><WifiOff  size={12} className="text-err" /><span className="text-[9px] font-mono text-err hidden md:block">offline</span></>}
           {backendOk === null  && <Loader2    size={12} className="text-gray-600 animate-spin" />}
         </div>
+
+        {/* Theme toggle (dark ⇄ light) */}
+        <ThemeButton />
 
         {/* Identity chip — display name (or "guest") + click to sign out */}
         <UserChip />
@@ -687,5 +691,20 @@ function MembersList({ currentRoom }: { currentRoom: string }) {
       ))}
       {error && <div className="text-[8px] font-mono text-err">{error}</div>}
     </div>
+  );
+}
+
+
+/* ─── Light / Dark theme toggle ──────────────────────────────────────────── */
+function ThemeButton() {
+  const [theme, setTheme] = useState(getTheme());
+  return (
+    <button
+      onClick={() => setTheme(toggleTheme())}
+      title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+      className="flex items-center justify-center w-7 h-7 rounded-md bg-bg-700 border border-bg-600 hover:border-accent text-gray-400 hover:text-accent transition-all flex-shrink-0"
+    >
+      {theme === "dark" ? <Sun size={12} /> : <Moon size={12} />}
+    </button>
   );
 }

@@ -480,6 +480,61 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     return out;
   }
 
+  function insertWorkingMacro(
+    macroType: string,
+    layout: { in: string[]; out: string[]; clk?: boolean },
+  ) {
+    // Drop a macro + auto-wired INPUT/OUTPUT/CLK around it as a SINGLE batch
+    // SET_CIRCUIT so peers in the same room see it as one update.
+    const uniq = () => Math.random().toString(36).slice(2, 8);
+    const stamp = Date.now().toString(36);
+    const gates: any[] = [];
+    const wires: any[] = [];
+    const xLeft  = 240;
+    const xMid   = 460;
+    const xRight = 680;
+    const spacing = 80;
+    const top = 80;
+    // Macro at center
+    const macroId = `mac_${stamp}_${uniq()}`;
+    gates.push({ id: macroId, type: macroType,
+                 x: xMid, y: top + (layout.in.length * spacing) / 2 });
+    // INPUTs on the left, pin index = position in layout.in
+    layout.in.forEach((nm, i) => {
+      const id = `in_${stamp}_${uniq()}`;
+      gates.push({ id, type: "INPUT", label: nm, value: 0,
+                   x: xLeft, y: top + i * spacing });
+      wires.push({ id: `w_${stamp}_${uniq()}`, from_gate: id, from_pin: 0,
+                   to_gate: macroId, to_pin: i });
+    });
+    // CLOCK if needed — wired to the LAST input pin (simulator convention)
+    if (layout.clk) {
+      const id = `clk_${stamp}_${uniq()}`;
+      const clkPinIdx = layout.in.length;  // CLK is the pin right after the data inputs
+      gates.push({ id, type: "CLOCK", label: "CLK",
+                   x: xLeft, y: top + layout.in.length * spacing });
+      wires.push({ id: `w_${stamp}_${uniq()}`, from_gate: id, from_pin: 0,
+                   to_gate: macroId, to_pin: clkPinIdx });
+    }
+    // OUTPUTs on the right, pin index matches layout.out order
+    layout.out.forEach((nm, i) => {
+      const id = `out_${stamp}_${uniq()}`;
+      gates.push({ id, type: "OUTPUT", label: nm,
+                   x: xRight, y: top + i * spacing });
+      wires.push({ id: `w_${stamp}_${uniq()}`, from_gate: macroId, from_pin: i,
+                   to_gate: id, to_pin: 0 });
+    });
+    // Merge into existing circuit instead of replacing — user may have
+    // already drawn other gates.
+    // We don't have direct access to current state here, so fire individual
+    // ADD_GATE / ADD_WIRE actions.
+    for (const g of gates) dispatch({ type: "ADD_GATE", gate: g } as any);
+    for (const w of wires) dispatch({ type: "ADD_WIRE", wire: w } as any);
+    setInfo({ gate_count: 1 + layout.out.length, wire_count: wires.length,
+              input_vars: layout.in, outputs: layout.out,
+              target_gates: null, placed_macro: macroType });
+  }
+
   function toggleGate(g: string) {
     setSGates((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
   }
@@ -747,41 +802,35 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
             )}
           </div>
 
-          {/* Single-block inserts: drop a macro gate (HA, FA, DFF...) onto the
-              canvas without going through the boolean synthesizer. */}
+          {/* Insert block: drops a macro + INPUT/OUTPUT/CLK around it,
+              pre-wired so the user can press RUN and see it simulate. */}
           <div>
             <label className="text-[9px] font-mono text-gray-500 block mb-1">
-              Insert block (drops a single macro on the canvas)
+              Insert block (drops a working block with IO already wired)
             </label>
             <div className="flex flex-wrap gap-1">
               {[
-                ["HA", "Half adder"],
-                ["FA", "Full adder"],
-                ["MUX2", "2:1 MUX"],
-                ["MUX4", "4:1 MUX"],
-                ["DEC24", "2:4 Dec"],
-                ["DEC38", "3:8 Dec"],
-                ["ENC42", "4:2 Enc"],
-                ["DFF", "D-FF"],
-                ["JKFF", "JK-FF"],
-                ["TFF", "T-FF"],
-                ["SRLATCH", "SR Latch"],
-                ["REG4", "4-bit Reg"],
-                ["CMP2", "2-bit cmp"],
-              ].map(([type, label]) => (
+                ["HA",     "Half adder", { in: ["A","B"],           out: ["Sum","Cout"]   }],
+                ["FA",     "Full adder", { in: ["A","B","Cin"],     out: ["Sum","Cout"]   }],
+                ["MUX2",   "2:1 MUX",    { in: ["A","B","Sel"],     out: ["Y"]            }],
+                ["MUX4",   "4:1 MUX",    { in: ["D0","D1","D2","D3","S0","S1"], out: ["Y"] }],
+                ["DEC24",  "2:4 Dec",    { in: ["A","B"],           out: ["Y0","Y1","Y2","Y3"] }],
+                ["DEC38",  "3:8 Dec",    { in: ["A","B","C"],       out: ["Y0","Y1","Y2","Y3","Y4","Y5","Y6","Y7"] }],
+                ["ENC42",  "4:2 Enc",    { in: ["I0","I1","I2","I3"], out: ["Y0","Y1"] }],
+                ["DFF",    "D-FF",       { in: ["D"],   clk: true,  out: ["Q","Qbar"] }],
+                ["JKFF",   "JK-FF",      { in: ["J","K"], clk: true, out: ["Q","Qbar"] }],
+                ["TFF",    "T-FF",       { in: ["T"],   clk: true,  out: ["Q","Qbar"] }],
+                ["SRLATCH","SR Latch",   { in: ["S","R"],           out: ["Q","Qbar"] }],
+                ["REG4",   "4-bit Reg",  { in: ["D0","D1","D2","D3"], clk: true, out: ["Q0","Q1","Q2","Q3"] }],
+                ["CMP2",   "2-bit cmp",  { in: ["A0","A1","B0","B1"], out: ["LT","EQ","GT"] }],
+              ].map(([type, label, layout]) => (
                 <button
-                  key={type}
-                  title={`Drop a single ${label} block`}
-                  onClick={() => {
-                    const id = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-                    dispatch({
-                      type: "ADD_GATE",
-                      gate: { id, type, x: 200 + Math.random() * 100, y: 160 + Math.random() * 100 } as any,
-                    });
-                  }}
+                  key={type as string}
+                  title={`Drop a working ${label} block (with INPUT/OUTPUT wired)`}
+                  onClick={() => insertWorkingMacro(type as string, layout as any)}
                   className="px-2 py-0.5 rounded text-[9px] font-mono border bg-bg-800 border-bg-600 text-gray-400 hover:border-accent hover:text-accent transition-all"
                 >
-                  {label}
+                  {label as string}
                 </button>
               ))}
             </div>

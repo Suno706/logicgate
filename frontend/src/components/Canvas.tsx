@@ -367,18 +367,18 @@ export function Canvas({ tool, snapGrid, pendingType, onClearPending, onGateSele
   return (
     <svg
       ref={svgRef}
-      className={`w-full h-full select-none ${cursor}`}
+      className={`w-full h-full select-none bg-bg-900 ${cursor}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onWheel={onWheel}
-      style={{ background: "#080b10", touchAction: "none" }}
+      style={{ touchAction: "none" }}
     >
-      {/* dot grid */}
+      {/* dot grid — uses theme token so it stays visible in both modes */}
       <defs>
         <pattern id="cdot" width={GRID * zoom} height={GRID * zoom} patternUnits="userSpaceOnUse"
           x={pan.x % (GRID * zoom)} y={pan.y % (GRID * zoom)}>
-          <circle cx={0} cy={0} r={0.7} fill="#1a2030" />
+          <circle cx={0} cy={0} r={0.7} fill="var(--lg-bg-600)" />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#cdot)" />

@@ -3271,6 +3271,55 @@ class QuestionSolver:
                     ],
                 }
 
+        # 0a-pre. Detect "X using <sub-block>" where the combination has NO
+        # known composition recipe. Without this, "adder using flip flop"
+        # silently falls through to the parametric/boolean path and the
+        # "using flip flop" hint is dropped — the user gets a normal adder
+        # and thinks the system ignored their input. Return a clear answer
+        # listing the available compositions instead.
+        m_using = re.search(
+            r'\busing\s+(half\s+adder|ha|full\s+adder|fa|'
+            r'(?:d\s+|t\s+|jk\s+|sr\s+)?flip\s+flop|dff|tff|jkff|'
+            r'register|shift\s+register|latch|sr\s+latch|d\s+latch|'
+            r'multiplexer|mux|2[-\s]?to[-\s]?1\s*mux|mux2|'
+            r'comparator|cmp|decoder|encoder)\b',
+            t_body, re.IGNORECASE)
+        if m_using:
+            phrase = re.sub(r'\s+', ' ', m_using.group(0).lower())
+            # Does ANY known RAW_TEMPLATE name match the whole body? If so
+            # we'll just fall through normally and the template loop will
+            # pick it up. We only emit the "not a valid composition" answer
+            # when NO template matches AND the parametric path also can't
+            # use it.
+            template_matches = any(
+                name in t_body
+                for name in RAW_TEMPLATES.keys()
+                if 'using' in name or 'from' in name or 'with' in name
+            )
+            if not template_matches:
+                comp_list = sorted({
+                    name for name in RAW_TEMPLATES.keys()
+                    if ' using ' in name or ' from ' in name or ' with ' in name
+                })
+                # Pick the 6 most-relevant suggestions by keyword overlap.
+                kw_tokens = set(re.findall(r'\w+', phrase))
+                comp_list.sort(key=lambda n: -len(set(re.findall(r'\w+', n)) & kw_tokens))
+                suggestions = comp_list[:6]
+                return {
+                    'answer': (
+                        f"`{body.strip()}` isn't a standard circuit composition. "
+                        f"Try one of these instead:\n  • " +
+                        "\n  • ".join(suggestions) +
+                        "\n\n(Tip: flip-flops are sequential / have memory — they "
+                        "compose into registers and counters, not into adders.)"
+                    ),
+                    'confidence': 0.4,
+                    'details': {'requested': body, 'suggestions': suggestions},
+                    'suggestions': suggestions,
+                    'intent': 'concept',
+                    'ml_source': 'compose_validator',
+                }
+
         # 0a. Parametric N-bit synthesis ("4-bit adder", "8-bit comparator").
         #     Tried before fixed templates so "1 bit adder" still maps to
         #     full adder via the alias rule, but "4 bit adder" goes here.

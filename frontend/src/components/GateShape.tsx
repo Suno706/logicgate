@@ -333,9 +333,9 @@ function IODetails({
           fontSize={7} fontWeight={700} letterSpacing={1} pointerEvents="none">
           {label || "INPUT"}
         </text>
-        {/* Switch track */}
+        {/* Switch track — themed so it stays visible in light mode too */}
         <rect x={cx - 12} y={20} width={24} height={10} rx={5}
-          fill="#0d0d18" stroke={fc} strokeWidth={1.2} />
+          fill="var(--lg-bg-900)" stroke={fc} strokeWidth={1.2} />
         {/* Switch ball */}
         <circle cx={isHigh ? cx + 6 : cx - 6} cy={25} r={4} fill={fc} />
         <text x={cx} y={h - 4} textAnchor="middle"
@@ -357,7 +357,7 @@ function IODetails({
           {label || "OUTPUT"}
         </text>
         <circle cx={cx} cy={h / 2 + 2} r={6}
-          fill={isHigh ? onCol : "#0d0d1a"} stroke={fc} strokeWidth={1.2} />
+          fill={isHigh ? onCol : "var(--lg-bg-900)"} stroke={fc} strokeWidth={1.2} />
         <text x={cx} y={h - 4} textAnchor="middle"
           fill={fc} fontFamily="JetBrains Mono, monospace"
           fontSize={7} fontWeight={700} pointerEvents="none">

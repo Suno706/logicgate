@@ -79,8 +79,13 @@ export function quineMcCluskey(
   }
 
   let terms: Term[] = minterms.map((m) => {
+    // Store bits MSB-first so bits[i] aligns with varNames[i] (varNames[0]=A
+    // is the MSB by convention). The old loop used `unshift`, which built
+    // the array LSB-first — symmetric functions (XOR/AND/majority) still
+    // produced a valid expression by coincidence, but asymmetric functions
+    // came out mirrored (e.g. B·C'·D' instead of A'·B'·C for m=2/n=4).
     const bits: (0 | 1 | null)[] = [];
-    for (let i = n - 1; i >= 0; i--) bits.unshift(((m >> i) & 1) as 0 | 1);
+    for (let i = 0; i < n; i++) bits.push(((m >> (n - 1 - i)) & 1) as 0 | 1);
     return { bits, covered: new Set([m]) };
   });
 
@@ -117,7 +122,7 @@ export function quineMcCluskey(
   if (!primeImplicants.length) {
     return minterms.map((m) => {
       const bits: (0 | 1)[] = [];
-      for (let i = n - 1; i >= 0; i--) bits.unshift(((m >> i) & 1) as 0 | 1);
+      for (let i = 0; i < n; i++) bits.push(((m >> (n - 1 - i)) & 1) as 0 | 1);
       return bits.map((b, i) => b ? varNames[i] : varNames[i] + "'").join("·");
     }).join(" + ");
   }

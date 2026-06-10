@@ -14,10 +14,36 @@ function _newSessionId(): string {
   return "s_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 }
 
+/**
+ * Session-id resolution order (per-tab → per-browser):
+ *   1. URL ?room=XYZ           — current tab is in room XYZ
+ *   2. sessionStorage room    — this tab's room (survives reloads, not tabs)
+ *   3. localStorage room      — legacy / fallback
+ *   4. fresh guest id
+ *
+ * Using sessionStorage instead of localStorage for the room means two
+ * browser TABS can be in different rooms simultaneously — required for
+ * one user hosting + watching multiple rooms.
+ */
 export function getSessionId(): string {
   try {
-    let s = localStorage.getItem("logicgate.session_id");
+    // 1. URL takes precedence — but ONLY when the URL has ?room=XYZ.
+    const url = new URL(window.location.href);
+    const fromUrl = (url.searchParams.get("room") || "").trim();
+    if (fromUrl) {
+      const sid = "room_" + fromUrl.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+      // Cache in sessionStorage so subsequent navigations on this tab stay
+      // in the same room even if the user removes ?room= from the URL bar.
+      sessionStorage.setItem("logicgate.session_id", sid);
+      return sid;
+    }
+    // 2. Per-tab room
+    let s = sessionStorage.getItem("logicgate.session_id");
+    if (s) return s;
+    // 3. Per-browser fallback (legacy)
+    s = localStorage.getItem("logicgate.session_id");
     if (!s) {
+      // 4. Fresh guest id
       s = _newSessionId();
       localStorage.setItem("logicgate.session_id", s);
     }
@@ -27,16 +53,23 @@ export function getSessionId(): string {
   }
 }
 
-/** Switch to a shared "room" scope so a group sees the same circuits. */
+/** Switch to a shared "room" scope. Stored PER-TAB (sessionStorage) so two
+ * tabs of the same browser can host/watch different rooms. */
 export function setRoom(code: string): void {
-  const sid = code.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
-  if (sid) localStorage.setItem("logicgate.session_id", "room_" + sid);
-  else     localStorage.setItem("logicgate.session_id", _newSessionId());
+  try {
+    const sid = code.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    if (sid) {
+      sessionStorage.setItem("logicgate.session_id", "room_" + sid);
+    } else {
+      sessionStorage.removeItem("logicgate.session_id");
+      localStorage.setItem("logicgate.session_id", _newSessionId());
+    }
+  } catch { /* */ }
 }
 
 export function getRoomCode(): string | null {
   const s = getSessionId();
-  return s.startsWith("room_") ? s.slice(5) : null;
+  return s.startsWith("room_") ? s.slice(5).toUpperCase() : null;
 }
 
 /** Remember that this browser created the named room — it can kick others. */

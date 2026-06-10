@@ -525,9 +525,9 @@ function CurrentRoomBlock(
   { currentRoom, onCopy, onLeave }:
   { currentRoom: string; onCopy: () => void; onLeave: () => void }
 ) {
-  const [maxUsers, setMaxUsers]   = useState<number>(20);
+  const [maxUsers, setMaxUsers]   = useState<number>(10);
   const [editing,  setEditing]    = useState<boolean>(false);
-  const [pending,  setPending]    = useState<number>(20);
+  const [pending,  setPending]    = useState<number>(10);
   const [error,    setError]      = useState<string | null>(null);
   // Trust the server's is_owner — works across devices when signed in,
   // falls back to localStorage flag when offline.
@@ -607,8 +607,8 @@ function CurrentRoomBlock(
           </>
         ) : (
           <>
-            <input type="number" min={2} max={100} value={pending}
-              onChange={(e) => setPending(Math.max(2, Math.min(100, Number(e.target.value) || 2)))}
+            <input type="number" min={2} max={50} value={pending}
+              onChange={(e) => setPending(Math.max(2, Math.min(50, Number(e.target.value) || 2)))}
               className="w-14 bg-bg-800 border border-bg-600 rounded px-1.5 py-0.5 text-[10px] text-gray-200" />
             <button onClick={saveCap}
               className="px-2 py-0.5 rounded bg-accent/25 text-accent text-[9px] hover:bg-accent/40">save</button>

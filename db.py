@@ -93,13 +93,13 @@ def _init_schema(conn: sqlite3.Connection):
             created_by    TEXT,
             created_at    REAL NOT NULL,
             last_used_at  REAL NOT NULL,
-            max_users     INTEGER DEFAULT 20,
+            max_users     INTEGER DEFAULT 10,
             owner_token   TEXT
         );
     """)
     # Add missing columns if upgrading from an older schema.
     for col_sql in (
-        "ALTER TABLE rooms ADD COLUMN max_users INTEGER DEFAULT 20",
+        "ALTER TABLE rooms ADD COLUMN max_users INTEGER DEFAULT 10",
         "ALTER TABLE rooms ADD COLUMN owner_token TEXT",
     ):
         try:
@@ -228,7 +228,7 @@ import secrets   # noqa: E402
 
 
 def generate_room_code(length: int = 6, owner_session: str = None,
-                       max_users: int = 20) -> tuple:
+                       max_users: int = 10) -> tuple:
     """Generate a unique room code AND an owner token. Returns (code, token).
     The token is the secret kept client-side so the original creator stays
     recognized as host even after setRoom() rewrites their session_id to
@@ -273,7 +273,7 @@ def get_room_owner(code: str) -> Optional[str]:
 
 
 def get_room_max_users(code: str) -> int:
-    """Returns the cap on concurrent users. Defaults to 20."""
+    """Returns the cap on concurrent users. Defaults to 10."""
     with cursor() as cur:
         row = cur.execute(
             "SELECT max_users FROM rooms WHERE code = ?", (code,)
@@ -283,13 +283,13 @@ def get_room_max_users(code: str) -> int:
                 return int(row["max_users"])
             except (TypeError, ValueError):
                 pass
-        return 20
+        return 10
 
 
 def set_room_max_users(code: str, owner_session: str, max_users: int) -> bool:
     """Owner-only: update max_users for a room. Returns True if the caller owns
     the room and the update happened."""
-    max_users = max(2, min(100, int(max_users)))
+    max_users = max(2, min(50, int(max_users)))
     with cursor() as cur:
         row = cur.execute(
             "SELECT created_by FROM rooms WHERE code = ?", (code,)

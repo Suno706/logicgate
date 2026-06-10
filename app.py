@@ -331,8 +331,8 @@ def room_config(code):
             max_users = int(max_users)
         except (TypeError, ValueError):
             return _err('max_users must be an integer', 400)
-        if max_users < 2 or max_users > 100:
-            return _err('max_users must be between 2 and 100', 400)
+        if max_users < 2 or max_users > 50:
+            return _err('max_users must be between 2 and 50', 400)
         if not _is_room_owner(code):
             return _err('Only the room owner can change settings.', 403)
         # Directly update — we already verified ownership via token-or-session.

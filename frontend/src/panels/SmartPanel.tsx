@@ -254,7 +254,7 @@ function AskTab({ circuit, dispatch }: { circuit: any; dispatch: any }) {
 }
 
 /* ─── Build Tab ─────────────────────────────────────────────────────────── */
-function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
+function BuildTab({ circuit, dispatch }: { circuit?: any; dispatch: any }) {
   const [q, setQ]         = useState("");
   const [loading, setL]   = useState(false);
   const [error, setErr]   = useState<string | null>(null);
@@ -397,10 +397,19 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     if (sMode === "template" && sPlaceMode === "place" && canPlaceCurrent) {
       const macroType = MACRO_TYPE_BY_TEMPLATE[sTemplate];
       const id = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+      // Stagger below existing gates so repeated Place clicks don't stack.
+      const existing = (circuit?.gates ?? []) as any[];
+      const lowestY = existing.length
+        ? Math.max(...existing.map((g) => (g.y ?? 0)))
+        : 0;
+      const y = (lowestY > 0 ? lowestY + 100 : 160) + Math.floor(Math.random() * 30);
+      const x = 200 + Math.floor(Math.random() * 80);
       dispatch({
         type: "ADD_GATE",
-        gate: { id, type: macroType, x: 200, y: 160 } as any,
+        gate: { id, type: macroType, x, y } as any,
       });
+      // Select it so the user can immediately drag / wire from it.
+      dispatch({ type: "SELECT", ids: [id], add: false } as any);
       setInfo({ gate_count: 1, wire_count: 0,
                 input_vars: [], outputs: [],
                 target_gates: null,
@@ -505,22 +514,29 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     macroType: string,
     layout: { in: string[]; out: string[]; clk?: boolean },
   ) {
-    // Drop a macro + auto-wired INPUT/OUTPUT/CLK around it as a SINGLE batch
-    // SET_CIRCUIT so peers in the same room see it as one update.
     const uniq = () => Math.random().toString(36).slice(2, 8);
     const stamp = Date.now().toString(36);
     const gates: any[] = [];
     const wires: any[] = [];
+    // Stagger each new insert so repeated clicks don't pile on top of each
+    // other (the user couldn't select what was buried underneath). Look at
+    // the current circuit on canvas to find a free spot below everything.
+    const existing = (circuit?.gates ?? []) as any[];
+    const lowestY = existing.length
+      ? Math.max(...existing.map((g) => (g.y ?? 0)))
+      : 0;
+    // Add a small jitter so two inserts of the same macro at the same time
+    // still don't perfectly overlap.
+    const baseTop = lowestY > 0 ? lowestY + 120 : 80;
+    const top = baseTop + Math.floor(Math.random() * 20);
     const xLeft  = 240;
     const xMid   = 460;
     const xRight = 680;
     const spacing = 80;
-    const top = 80;
     // Macro at center
     const macroId = `mac_${stamp}_${uniq()}`;
     gates.push({ id: macroId, type: macroType,
                  x: xMid, y: top + (layout.in.length * spacing) / 2 });
-    // INPUTs on the left, pin index = position in layout.in
     layout.in.forEach((nm, i) => {
       const id = `in_${stamp}_${uniq()}`;
       gates.push({ id, type: "INPUT", label: nm, value: 0,
@@ -528,16 +544,14 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
       wires.push({ id: `w_${stamp}_${uniq()}`, from_gate: id, from_pin: 0,
                    to_gate: macroId, to_pin: i });
     });
-    // CLOCK if needed — wired to the LAST input pin (simulator convention)
     if (layout.clk) {
       const id = `clk_${stamp}_${uniq()}`;
-      const clkPinIdx = layout.in.length;  // CLK is the pin right after the data inputs
+      const clkPinIdx = layout.in.length;
       gates.push({ id, type: "CLOCK", label: "CLK",
                    x: xLeft, y: top + layout.in.length * spacing });
       wires.push({ id: `w_${stamp}_${uniq()}`, from_gate: id, from_pin: 0,
                    to_gate: macroId, to_pin: clkPinIdx });
     }
-    // OUTPUTs on the right, pin index matches layout.out order
     layout.out.forEach((nm, i) => {
       const id = `out_${stamp}_${uniq()}`;
       gates.push({ id, type: "OUTPUT", label: nm,
@@ -545,12 +559,11 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
       wires.push({ id: `w_${stamp}_${uniq()}`, from_gate: macroId, from_pin: i,
                    to_gate: id, to_pin: 0 });
     });
-    // Merge into existing circuit instead of replacing — user may have
-    // already drawn other gates.
-    // We don't have direct access to current state here, so fire individual
-    // ADD_GATE / ADD_WIRE actions.
     for (const g of gates) dispatch({ type: "ADD_GATE", gate: g } as any);
     for (const w of wires) dispatch({ type: "ADD_WIRE", wire: w } as any);
+    // Select the newly-inserted macro so the user can move it or wire to it
+    // immediately without hunting for it on canvas.
+    dispatch({ type: "SELECT", ids: [macroId], add: false } as any);
     setInfo({ gate_count: 1 + layout.out.length, wire_count: wires.length,
               input_vars: layout.in, outputs: layout.out,
               target_gates: null, placed_macro: macroType });

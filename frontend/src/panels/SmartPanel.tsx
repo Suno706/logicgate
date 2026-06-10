@@ -333,6 +333,18 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     { label: "Registers / Counters", items: [
         "4 bit shift register", "4 bit counter",
     ]},
+    { label: "Composed from macro blocks (HA / FA / DFF / MUX2)", items: [
+        "full adder using half adder",
+        "4 bit adder using full adder",
+        "8 bit adder using full adder",
+        "4 bit subtractor using full adder",
+        "4 to 1 mux using 2 to 1 mux",
+        "4 bit register using d flip flop",
+        "8 bit register using d flip flop",
+        "4 bit shift register using d flip flop",
+        "4 bit counter using t flip flop",
+        "4 bit ring counter",
+    ]},
   ];
   const GATE_OPTIONS = ["NAND", "NOR", "AND", "OR", "NOT", "XOR", "XNOR"];
 

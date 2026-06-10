@@ -1093,6 +1093,282 @@ def _raw_template_4to1_mux():
     }
 
 
+# ─── Compose-from-macro-block templates ─────────────────────────────────────
+# These produce circuits where the building blocks remain visible as MACRO
+# GATES (HA, FA, DFF, etc.), rather than being expanded to AND/OR/NOT/XOR.
+# Lets the user "build X using HA / FA / DFF" and actually see sub-blocks.
+
+def _raw_template_4bit_adder_from_fa():
+    """4-bit ripple-carry adder built from 4 visible FA macro blocks.
+       FA pin layout: in0=A, in1=B, in2=Cin → out0=S, out1=Cout"""
+    gates, wires = [], []
+    # Inputs
+    for i in range(4):
+        gates.append({'id': f'A{i}', 'type': 'INPUT', 'label': f'A{i}', 'value': 0,
+                      'x': 60, 'y': 60 + i * 90})
+        gates.append({'id': f'B{i}', 'type': 'INPUT', 'label': f'B{i}', 'value': 0,
+                      'x': 60, 'y': 100 + i * 90})
+    gates.append({'id': 'Cin', 'type': 'INPUT', 'label': 'Cin', 'value': 0,
+                  'x': 60, 'y': 470})
+    # 4 Full Adder macro blocks
+    for i in range(4):
+        gates.append({'id': f'FA{i}', 'type': 'FA',
+                      'x': 260 + i * 160, 'y': 80 + i * 70})
+    # Outputs
+    for i in range(4):
+        gates.append({'id': f'S{i}', 'type': 'OUTPUT', 'label': f'S{i}',
+                      'x': 260 + i * 160, 'y': 30 + i * 70})
+    gates.append({'id': 'Cout', 'type': 'OUTPUT', 'label': 'Cout',
+                  'x': 860, 'y': 380})
+    # Wires
+    wid = 0
+    def w(fg, fp, tg, tp):
+        nonlocal wid
+        wid += 1
+        wires.append({'id': f'w{wid}', 'from_gate': fg, 'from_pin': fp,
+                      'to_gate': tg, 'to_pin': tp})
+    prev_carry = 'Cin'
+    prev_carry_pin = 0
+    for i in range(4):
+        w(f'A{i}', 0, f'FA{i}', 0)             # Ai -> FA.in0
+        w(f'B{i}', 0, f'FA{i}', 1)             # Bi -> FA.in1
+        w(prev_carry, prev_carry_pin, f'FA{i}', 2)  # carry chain
+        w(f'FA{i}', 0, f'S{i}', 0)             # Sum out
+        prev_carry, prev_carry_pin = f'FA{i}', 1
+    w('FA3', 1, 'Cout', 0)
+    return {'gates': gates, 'wires': wires}
+
+
+def _raw_template_8bit_adder_from_fa():
+    """8-bit ripple-carry adder built from 8 visible FA macro blocks."""
+    gates, wires = [], []
+    for i in range(8):
+        gates.append({'id': f'A{i}', 'type': 'INPUT', 'label': f'A{i}', 'value': 0,
+                      'x': 40, 'y': 30 + i * 90})
+        gates.append({'id': f'B{i}', 'type': 'INPUT', 'label': f'B{i}', 'value': 0,
+                      'x': 40, 'y': 65 + i * 90})
+    gates.append({'id': 'Cin', 'type': 'INPUT', 'label': 'Cin', 'value': 0,
+                  'x': 40, 'y': 770})
+    for i in range(8):
+        gates.append({'id': f'FA{i}', 'type': 'FA',
+                      'x': 230 + i * 130, 'y': 50 + i * 60})
+    for i in range(8):
+        gates.append({'id': f'S{i}', 'type': 'OUTPUT', 'label': f'S{i}',
+                      'x': 230 + i * 130, 'y': 10 + i * 60})
+    gates.append({'id': 'Cout', 'type': 'OUTPUT', 'label': 'Cout',
+                  'x': 1300, 'y': 530})
+    wid = 0
+    def w(fg, fp, tg, tp):
+        nonlocal wid
+        wid += 1
+        wires.append({'id': f'w{wid}', 'from_gate': fg, 'from_pin': fp,
+                      'to_gate': tg, 'to_pin': tp})
+    prev_carry, prev_pin = 'Cin', 0
+    for i in range(8):
+        w(f'A{i}', 0, f'FA{i}', 0)
+        w(f'B{i}', 0, f'FA{i}', 1)
+        w(prev_carry, prev_pin, f'FA{i}', 2)
+        w(f'FA{i}', 0, f'S{i}', 0)
+        prev_carry, prev_pin = f'FA{i}', 1
+    w('FA7', 1, 'Cout', 0)
+    return {'gates': gates, 'wires': wires}
+
+
+def _raw_template_4bit_register_from_dff():
+    """4-bit parallel register built from 4 visible D-FF macro blocks sharing
+       one CLK input. Pin layout for DFF: in0=D, in1=CLK → out0=Q, out1=Qbar."""
+    gates, wires = [], []
+    for i in range(4):
+        gates.append({'id': f'D{i}', 'type': 'INPUT', 'label': f'D{i}', 'value': 0,
+                      'x': 80, 'y': 60 + i * 110})
+    gates.append({'id': 'CLK', 'type': 'CLOCK', 'label': 'CLK',
+                  'x': 80, 'y': 500})
+    for i in range(4):
+        gates.append({'id': f'DFF{i}', 'type': 'DFF',
+                      'x': 280, 'y': 80 + i * 110})
+    for i in range(4):
+        gates.append({'id': f'Q{i}', 'type': 'OUTPUT', 'label': f'Q{i}',
+                      'x': 500, 'y': 80 + i * 110})
+    wid = 0
+    def w(fg, fp, tg, tp):
+        nonlocal wid; wid += 1
+        wires.append({'id': f'w{wid}', 'from_gate': fg, 'from_pin': fp,
+                      'to_gate': tg, 'to_pin': tp})
+    for i in range(4):
+        w(f'D{i}', 0, f'DFF{i}', 0)
+        w('CLK',   0, f'DFF{i}', 1)
+        w(f'DFF{i}', 0, f'Q{i}', 0)
+    return {'gates': gates, 'wires': wires}
+
+
+def _raw_template_8bit_register_from_dff():
+    """8-bit parallel register built from 8 visible D-FF macro blocks."""
+    gates, wires = [], []
+    for i in range(8):
+        gates.append({'id': f'D{i}', 'type': 'INPUT', 'label': f'D{i}', 'value': 0,
+                      'x': 60, 'y': 40 + i * 90})
+    gates.append({'id': 'CLK', 'type': 'CLOCK', 'label': 'CLK',
+                  'x': 60, 'y': 770})
+    for i in range(8):
+        gates.append({'id': f'DFF{i}', 'type': 'DFF',
+                      'x': 260, 'y': 60 + i * 90})
+        gates.append({'id': f'Q{i}', 'type': 'OUTPUT', 'label': f'Q{i}',
+                      'x': 460, 'y': 60 + i * 90})
+    wid = 0
+    def w(fg, fp, tg, tp):
+        nonlocal wid; wid += 1
+        wires.append({'id': f'w{wid}', 'from_gate': fg, 'from_pin': fp,
+                      'to_gate': tg, 'to_pin': tp})
+    for i in range(8):
+        w(f'D{i}', 0, f'DFF{i}', 0)
+        w('CLK',   0, f'DFF{i}', 1)
+        w(f'DFF{i}', 0, f'Q{i}', 0)
+    return {'gates': gates, 'wires': wires}
+
+
+def _raw_template_4bit_shift_reg_from_dff():
+    """4-bit serial-in / parallel-out shift register: 4 D-FF macros chained,
+       each FF's Q feeds the next FF's D. Shared CLK."""
+    gates, wires = [], []
+    gates.append({'id': 'SIN', 'type': 'INPUT', 'label': 'SerIn', 'value': 0,
+                  'x': 60, 'y': 80})
+    gates.append({'id': 'CLK', 'type': 'CLOCK', 'label': 'CLK',
+                  'x': 60, 'y': 280})
+    for i in range(4):
+        gates.append({'id': f'DFF{i}', 'type': 'DFF',
+                      'x': 240 + i * 180, 'y': 100})
+        gates.append({'id': f'Q{i}', 'type': 'OUTPUT', 'label': f'Q{i}',
+                      'x': 280 + i * 180, 'y': 40})
+    wid = 0
+    def w(fg, fp, tg, tp):
+        nonlocal wid; wid += 1
+        wires.append({'id': f'w{wid}', 'from_gate': fg, 'from_pin': fp,
+                      'to_gate': tg, 'to_pin': tp})
+    prev_out, prev_pin = 'SIN', 0
+    for i in range(4):
+        w(prev_out, prev_pin, f'DFF{i}', 0)
+        w('CLK',    0,        f'DFF{i}', 1)
+        w(f'DFF{i}', 0, f'Q{i}', 0)
+        prev_out, prev_pin = f'DFF{i}', 0
+    return {'gates': gates, 'wires': wires}
+
+
+def _raw_template_ring_counter_4bit():
+    """4-bit ring counter built from 4 DFF macros in a ring: each FF's Q
+       feeds the next, and the last FF's Q feeds back to the first."""
+    gates, wires = [], []
+    gates.append({'id': 'CLK', 'type': 'CLOCK', 'label': 'CLK',
+                  'x': 60, 'y': 320})
+    for i in range(4):
+        gates.append({'id': f'DFF{i}', 'type': 'DFF',
+                      'x': 200 + i * 180, 'y': 120})
+        gates.append({'id': f'Q{i}', 'type': 'OUTPUT', 'label': f'Q{i}',
+                      'x': 240 + i * 180, 'y': 60})
+    wid = 0
+    def w(fg, fp, tg, tp):
+        nonlocal wid; wid += 1
+        wires.append({'id': f'w{wid}', 'from_gate': fg, 'from_pin': fp,
+                      'to_gate': tg, 'to_pin': tp})
+    for i in range(4):
+        prev = f'DFF{(i - 1) % 4}'
+        w(prev, 0, f'DFF{i}', 0)        # Q[i-1] -> D[i]
+        w('CLK', 0, f'DFF{i}', 1)
+        w(f'DFF{i}', 0, f'Q{i}', 0)
+    return {'gates': gates, 'wires': wires}
+
+
+def _raw_template_4bit_counter_from_tff():
+    """4-bit ripple counter built from 4 visible T-FF macros chained.
+       Each TFF's Q feeds the next TFF's CLK. First TFF's T is tied HIGH."""
+    gates, wires = [], []
+    gates.append({'id': 'VCC', 'type': 'VCC', 'label': 'HIGH',
+                  'x': 60, 'y': 80})
+    gates.append({'id': 'CLK', 'type': 'CLOCK', 'label': 'CLK',
+                  'x': 60, 'y': 220})
+    for i in range(4):
+        gates.append({'id': f'TFF{i}', 'type': 'TFF',
+                      'x': 240 + i * 180, 'y': 140})
+        gates.append({'id': f'Q{i}', 'type': 'OUTPUT', 'label': f'Q{i}',
+                      'x': 280 + i * 180, 'y': 60})
+    wid = 0
+    def w(fg, fp, tg, tp):
+        nonlocal wid; wid += 1
+        wires.append({'id': f'w{wid}', 'from_gate': fg, 'from_pin': fp,
+                      'to_gate': tg, 'to_pin': tp})
+    for i in range(4):
+        w('VCC', 0, f'TFF{i}', 0)   # T tied high
+        if i == 0:
+            w('CLK', 0, f'TFF{0}', 1)
+        else:
+            w(f'TFF{i-1}', 0, f'TFF{i}', 1)  # previous Q drives next CLK
+        w(f'TFF{i}', 0, f'Q{i}', 0)
+    return {'gates': gates, 'wires': wires}
+
+
+def _raw_template_4to1_mux_from_mux2():
+    """4-to-1 multiplexer built from 3 visible 2:1 MUX macros (tree of MUX2).
+       MUX2 pin layout: in0=A, in1=B, in2=SEL → out0=Y."""
+    gates, wires = [], []
+    for i in range(4):
+        gates.append({'id': f'D{i}', 'type': 'INPUT', 'label': f'D{i}', 'value': 0,
+                      'x': 60, 'y': 40 + i * 80})
+    gates.append({'id': 'S0', 'type': 'INPUT', 'label': 'S0', 'value': 0,
+                  'x': 60, 'y': 380})
+    gates.append({'id': 'S1', 'type': 'INPUT', 'label': 'S1', 'value': 0,
+                  'x': 60, 'y': 450})
+    gates.append({'id': 'M1', 'type': 'MUX2', 'x': 280, 'y':  60})  # D0, D1, S0
+    gates.append({'id': 'M2', 'type': 'MUX2', 'x': 280, 'y': 220})  # D2, D3, S0
+    gates.append({'id': 'M3', 'type': 'MUX2', 'x': 500, 'y': 140})  # M1, M2, S1
+    gates.append({'id': 'Y',  'type': 'OUTPUT', 'label': 'Y', 'x': 700, 'y': 160})
+    wid = 0
+    def w(fg, fp, tg, tp):
+        nonlocal wid; wid += 1
+        wires.append({'id': f'w{wid}', 'from_gate': fg, 'from_pin': fp,
+                      'to_gate': tg, 'to_pin': tp})
+    w('D0', 0, 'M1', 0); w('D1', 0, 'M1', 1); w('S0', 0, 'M1', 2)
+    w('D2', 0, 'M2', 0); w('D3', 0, 'M2', 1); w('S0', 0, 'M2', 2)
+    w('M1', 0, 'M3', 0); w('M2', 0, 'M3', 1); w('S1', 0, 'M3', 2)
+    w('M3', 0, 'Y',  0)
+    return {'gates': gates, 'wires': wires}
+
+
+def _raw_template_subtractor_from_fa():
+    """4-bit subtractor: A - B  via FA macros with B inverted + Cin=1.
+       (Standard 2's-complement subtraction implementation.)"""
+    gates, wires = [], []
+    for i in range(4):
+        gates.append({'id': f'A{i}', 'type': 'INPUT', 'label': f'A{i}', 'value': 0,
+                      'x': 40, 'y': 40 + i * 90})
+        gates.append({'id': f'B{i}', 'type': 'INPUT', 'label': f'B{i}', 'value': 0,
+                      'x': 40, 'y': 75 + i * 90})
+        gates.append({'id': f'NB{i}', 'type': 'NOT',
+                      'x': 180, 'y': 75 + i * 90})  # ~B inverters
+    gates.append({'id': 'VCC', 'type': 'VCC', 'label': 'HIGH',
+                  'x': 40, 'y': 440})  # Cin = 1 for 2's complement
+    for i in range(4):
+        gates.append({'id': f'FA{i}', 'type': 'FA',
+                      'x': 340 + i * 160, 'y': 90 + i * 70})
+        gates.append({'id': f'D{i}', 'type': 'OUTPUT', 'label': f'D{i}',
+                      'x': 340 + i * 160, 'y': 40 + i * 70})
+    gates.append({'id': 'Borrow', 'type': 'OUTPUT', 'label': 'Bout',
+                  'x': 940, 'y': 420})
+    wid = 0
+    def w(fg, fp, tg, tp):
+        nonlocal wid; wid += 1
+        wires.append({'id': f'w{wid}', 'from_gate': fg, 'from_pin': fp,
+                      'to_gate': tg, 'to_pin': tp})
+    prev_c, prev_p = 'VCC', 0
+    for i in range(4):
+        w(f'B{i}', 0, f'NB{i}', 0)
+        w(f'A{i}', 0, f'FA{i}', 0)
+        w(f'NB{i}', 0, f'FA{i}', 1)
+        w(prev_c, prev_p, f'FA{i}', 2)
+        w(f'FA{i}', 0, f'D{i}', 0)
+        prev_c, prev_p = f'FA{i}', 1
+    w('FA3', 1, 'Borrow', 0)
+    return {'gates': gates, 'wires': wires}
+
+
 RAW_TEMPLATES = {
     'sr latch':       _raw_template_sr_latch_nor,
     'sr latch nor':   _raw_template_sr_latch_nor,
@@ -1121,6 +1397,36 @@ RAW_TEMPLATES = {
     '4-to-1 mux':                      _raw_template_4to1_mux,
     '4 to 1 multiplexer':              _raw_template_4to1_mux,
     '4to1 mux':                        _raw_template_4to1_mux,
+    # NEW: composed from macro blocks (sub-circuits stay visible on canvas)
+    '4 bit adder using full adder':    _raw_template_4bit_adder_from_fa,
+    '4 bit adder using fa':            _raw_template_4bit_adder_from_fa,
+    '4-bit adder using full adder':    _raw_template_4bit_adder_from_fa,
+    '4 bit adder from full adder':     _raw_template_4bit_adder_from_fa,
+    '8 bit adder using full adder':    _raw_template_8bit_adder_from_fa,
+    '8 bit adder using fa':            _raw_template_8bit_adder_from_fa,
+    '8-bit adder using full adder':    _raw_template_8bit_adder_from_fa,
+    '4 bit register using d flip flop': _raw_template_4bit_register_from_dff,
+    '4 bit register using dff':         _raw_template_4bit_register_from_dff,
+    '4-bit register using d flip flop': _raw_template_4bit_register_from_dff,
+    '8 bit register using d flip flop': _raw_template_8bit_register_from_dff,
+    '8 bit register using dff':         _raw_template_8bit_register_from_dff,
+    '4 bit shift register using d flip flop': _raw_template_4bit_shift_reg_from_dff,
+    '4 bit shift register using dff':         _raw_template_4bit_shift_reg_from_dff,
+    'serial in parallel out shift register':  _raw_template_4bit_shift_reg_from_dff,
+    '4 bit counter using t flip flop':  _raw_template_4bit_counter_from_tff,
+    '4 bit counter using tff':          _raw_template_4bit_counter_from_tff,
+    '4-bit counter using t flip flop':  _raw_template_4bit_counter_from_tff,
+    'ripple counter using t flip flop': _raw_template_4bit_counter_from_tff,
+    '4 bit ring counter':               _raw_template_ring_counter_4bit,
+    'ring counter using d flip flop':   _raw_template_ring_counter_4bit,
+    'ring counter using dff':           _raw_template_ring_counter_4bit,
+    '4 to 1 mux using 2 to 1 mux':      _raw_template_4to1_mux_from_mux2,
+    '4 to 1 mux using mux2':            _raw_template_4to1_mux_from_mux2,
+    '4-to-1 mux using 2-to-1 mux':      _raw_template_4to1_mux_from_mux2,
+    '4 to 1 multiplexer using 2 to 1 multiplexer': _raw_template_4to1_mux_from_mux2,
+    '4 bit subtractor using full adder':   _raw_template_subtractor_from_fa,
+    '4 bit subtractor using fa':           _raw_template_subtractor_from_fa,
+    '4-bit subtractor using full adder':   _raw_template_subtractor_from_fa,
 }
 
 
@@ -2395,6 +2701,18 @@ def _try_parametric_nbit(t_body: str):
     Detect "N-bit adder", "N-bit comparator", etc. and return
     (canonical_name, parts_list) or None.
     """
+    # If the user explicitly asks to build the N-bit unit OUT OF macro
+    # sub-blocks ("4 bit adder using full adder", "4 bit register using d
+    # flip flop"), defer to the RAW_TEMPLATES compositional table so the FA /
+    # DFF / etc. blocks remain visible instead of being expanded.
+    if re.search(
+        r'\busing\s+(?:full\s+adder|fa|d\s+flip\s+flop|dff|'
+        r't\s+flip\s+flop|tff|jk\s+flip\s+flop|jkff|'
+        r'half\s+adder|ha|sr\s+latch|d\s+latch|'
+        r'2\s*[-\s]?to\s*[-\s]?1\s*(?:mux|multiplexer)|mux2)\b',
+        t_body, re.IGNORECASE,
+    ):
+        return None
     m = _NBIT_RE.search(t_body)
     if not m:
         return None

@@ -107,6 +107,17 @@ const SYNTHESIS_ONLY: { name: string; query: string; desc: string }[] = [
   // ── Registers / counters ──
   { name: "4-bit Shift Reg",    query: "4 bit shift register",       desc: "Parallel-out" },
   { name: "4-bit Counter",      query: "4 bit counter",              desc: "Mod-16 ripple" },
+  // ── Composed from macro blocks (sub-circuits stay visible) ──
+  { name: "FA using HA",        query: "full adder using half adder", desc: "2 HA + OR" },
+  { name: "4-bit Adder (FA)",   query: "4 bit adder using full adder", desc: "4× FA chained" },
+  { name: "8-bit Adder (FA)",   query: "8 bit adder using full adder", desc: "8× FA chained" },
+  { name: "4-bit Sub (FA)",     query: "4 bit subtractor using full adder", desc: "FA + 2's comp" },
+  { name: "4-bit Reg (DFF)",    query: "4 bit register using d flip flop", desc: "4× DFF parallel" },
+  { name: "8-bit Reg (DFF)",    query: "8 bit register using d flip flop", desc: "8× DFF parallel" },
+  { name: "Shift Reg (DFF)",    query: "4 bit shift register using d flip flop", desc: "Serial-in/parallel-out" },
+  { name: "Counter (TFF)",      query: "4 bit counter using t flip flop", desc: "4× TFF ripple" },
+  { name: "Ring Counter",       query: "4 bit ring counter",          desc: "4× DFF in ring" },
+  { name: "4:1 MUX (MUX2)",     query: "4 to 1 mux using 2 to 1 mux", desc: "3× MUX2 tree" },
 ];
 
 const COLORS: Record<string, string> = {

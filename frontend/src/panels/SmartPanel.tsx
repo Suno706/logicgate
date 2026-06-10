@@ -265,7 +265,7 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
   type Mode = "template" | "expr" | "truth";
   const [sMode,       setSMode]       = useState<Mode>("template");
   const [sTemplate,   setSTemplate]   = useState<string>("half adder");
-  const [sPlaceMode,  setSPlaceMode]  = useState<"place" | "expand">("place");
+  const [sPlaceMode,  setSPlaceMode]  = useState<"place" | "expand" | "compose">("place");
   // sExpr legacy single-input expr is kept around so the existing build path
   // keeps compiling, but the UI now uses bExprs (one per output).
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -294,6 +294,22 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
     "4 bit shift register":"REG4",
   };
   const canPlaceCurrent = !!MACRO_TYPE_BY_TEMPLATE[sTemplate];
+
+  // For each template that has a "built from sub-blocks" version, map to the
+  // backend's compositional template name. When user picks Compose mode, the
+  // build call routes through this name instead of expanding to primitives.
+  const COMPOSE_OF_TEMPLATE: Record<string, string> = {
+    "full adder":          "full adder using half adder",
+    "4 bit adder":         "4 bit adder using full adder",
+    "8 bit adder":         "8 bit adder using full adder",
+    "4 bit subtractor":    "4 bit subtractor using full adder",
+    "4 bit register":      "4 bit register using d flip flop",
+    "8 bit register":      "8 bit register using d flip flop",
+    "4 bit shift register":"4 bit shift register using d flip flop",
+    "4 bit counter":       "4 bit counter using t flip flop",
+    "4 to 1 mux":          "4 to 1 mux using 2 to 1 mux",
+  };
+  const canComposeCurrent = !!COMPOSE_OF_TEMPLATE[sTemplate];
   // Truth-table state — tBits[row][col] = output bit (rows × outputs)
   const [tInputs,   setTInputs]   = useState<number>(2);
   const [tOutputs,  setTOutputs]  = useState<number>(1);
@@ -425,7 +441,12 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
         q2 = "build " + outExprs.map((o) => `${o.name} = ${o.expr}`).join(" ; ");
       }
     } else {
-      q2 = `build ${sTemplate}`;
+      // Template mode. If user chose "Compose from sub-blocks" and a
+      // compositional variant exists for this template, route there.
+      const tpl = (sPlaceMode === "compose" && COMPOSE_OF_TEMPLATE[sTemplate])
+        ? COMPOSE_OF_TEMPLATE[sTemplate]
+        : sTemplate;
+      q2 = `build ${tpl}`;
     }
     if (sGates.length > 0) {
       q2 += ` using ${sGates.join(" and ")}`;
@@ -599,26 +620,49 @@ function BuildTab({ dispatch }: { circuit?: any; dispatch: any }) {
                   </optgroup>
                 ))}
               </select>
-              {/* Place vs Expand toggle (Place = single macro block, Expand = synthesize from primitives) */}
-              <div className="flex gap-1 text-[9px] font-mono">
+              {/* Three build modes:
+                  Place   — drop a single macro block (HA, FA, DFF…)
+                  Compose — built from SUB-BLOCKS (e.g. full adder = 2× HA + OR)
+                  Expand  — synthesized down to primitive AND/OR/NOT/XOR */}
+              <div className="grid grid-cols-3 gap-1 text-[9px] font-mono">
                 <button
                   onClick={() => setSPlaceMode("place")}
                   disabled={!canPlaceCurrent}
-                  title={canPlaceCurrent ? "Drop a single macro block" : "This template has no single-block form — only Expand available"}
-                  className={`flex-1 py-1 rounded border transition-all ${
+                  title={canPlaceCurrent ? "Drop a single macro block" : "This template has no single-block form"}
+                  className={`py-1 rounded border transition-all ${
                     sPlaceMode === "place" && canPlaceCurrent
                       ? "bg-accent/25 border-accent text-accent"
                       : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500 disabled:opacity-40"
                   }`}
-                >Place (single block)</button>
+                >Place</button>
+                <button
+                  onClick={() => setSPlaceMode("compose")}
+                  disabled={!canComposeCurrent}
+                  title={canComposeCurrent
+                    ? `Build from sub-blocks (${COMPOSE_OF_TEMPLATE[sTemplate]})`
+                    : "No compositional variant for this template"}
+                  className={`py-1 rounded border transition-all ${
+                    sPlaceMode === "compose" && canComposeCurrent
+                      ? "bg-accent/25 border-accent text-accent"
+                      : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500 disabled:opacity-40"
+                  }`}
+                >Compose</button>
                 <button
                   onClick={() => setSPlaceMode("expand")}
-                  className={`flex-1 py-1 rounded border transition-all ${
-                    sPlaceMode === "expand" || !canPlaceCurrent
+                  className={`py-1 rounded border transition-all ${
+                    (sPlaceMode === "expand" || (!canPlaceCurrent && !canComposeCurrent))
                       ? "bg-accent/25 border-accent text-accent"
                       : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500"
                   }`}
-                >Expand (from gates)</button>
+                >Expand</button>
+              </div>
+              <div className="text-[8px] font-mono text-gray-600 mt-1 leading-tight">
+                {sPlaceMode === "place"   && "Drops a single macro block on the canvas."}
+                {sPlaceMode === "compose" && canComposeCurrent &&
+                  <>Built from sub-blocks: <span className="text-accent">{COMPOSE_OF_TEMPLATE[sTemplate]}</span></>}
+                {sPlaceMode === "compose" && !canComposeCurrent &&
+                  "No sub-block recipe for this template — pick Place or Expand."}
+                {sPlaceMode === "expand"  && "Built from primitive AND/OR/NOT/XOR gates."}
               </div>
             </div>
           )}

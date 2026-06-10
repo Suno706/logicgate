@@ -74,13 +74,22 @@ def kick_socket(room: str, target_sid: str) -> bool:
     """Force-disconnect a user from a room. Used by the kick API endpoint.
     Emits a 'kicked' event to the target so the client can show a message,
     then drops them from the roster and forces a transport disconnect.
-    Returns True if the target was found in the room."""
+    Returns True if the target was found in the room.
+
+    `room` may be the bare room CODE ("A7F2KQ") as the REST API uses, or
+    the socket-room form the clients actually join ("room_a7f2kq")."""
     if _socketio is None:
         return False
-    if _sid_room.get(target_sid) != room:
+    actual = _sid_room.get(target_sid)
+    if actual is None:
         return False
+    accepted = {room, f"room_{room.lower()}"}
+    if actual not in accepted:
+        return False
+    room = actual    # use the real socket-room name from here on
+    pretty = room[5:].upper() if room.startswith("room_") else room
     try:
-        _socketio.emit("kicked", {"room": room, "reason": "Removed by host"},
+        _socketio.emit("kicked", {"room": pretty, "reason": "Removed by host"},
                        to=target_sid, namespace="/collab")
     except Exception:
         pass

@@ -22,7 +22,10 @@ export function inputsReachingOutput(circuit: Circuit, target: Gate): Gate[] {
     }
   }
   return circuit.gates.filter((g) =>
-    (g.type === "INPUT" || g.type === "CLOCK") && seen.has(g.id));
+    (g.type === "INPUT" || g.type === "CLOCK") && seen.has(g.id)
+    // Constant-tie inputs from older synthesized circuits are not real
+    // variables — sweeping them would double the K-map with garbage rows.
+    && !(g.label || "").startsWith("const_"));
 }
 
 /** Sweep every input combination, return outMap[mask] = 0|1 for one OUTPUT gate. */

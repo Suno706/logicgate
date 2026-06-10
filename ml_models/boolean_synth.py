@@ -18,6 +18,19 @@ Gate-set restriction (target_gates):
   ['AND','OR','NOT']  -> classical 3-gate form (default)
   any combination of {AND, OR, NOT, NAND, NOR, XOR, XNOR}
 
+Macro building blocks (also accepted in target_gates):
+  'HA'   -> XOR terms become HA Sum pins, AND terms become HA Carry pins
+            (the classic "full adder = 2 HA + OR" generalised to ANY function;
+            leftover OR/NOT are plain glue gates)
+  'FA'   -> same idea with Cin tricks: XOR=FA(a,b,0).S, AND=FA(a,b,0).Co,
+            OR=FA(a,b,1).Co (majority with a constant 1)
+  'MUX2' -> full Shannon expansion: ANY truth table as a tree of 2:1 muxes
+  'DFF' / 'TFF' / 'JKFF' / 'SRLATCH'
+         -> the combinational core is built normally, then every output is
+            registered through the storage element (D=f; J=f,K=~f; S=f,R=~f)
+            with a shared CLK. Mixing macros with primitive gates is always
+            allowed, which is what makes every truth table reachable.
+
 The output is:
   {
     'gates': [{'id', 'type', 'x', 'y', 'value'?, 'label'?, 'clockHz'?}, ...],
@@ -303,9 +316,138 @@ def _norify(n):
     return (t, _norify(n[1]), _norify(n[2]))
 
 
+# -- Macro building blocks -----------------------------------------------------
+#
+# Macro AST node: ('MPIN', macro_type, out_pin, (child, child, ...))
+# One macro *instance* is shared by all MPIN nodes with the same children,
+# so HA Sum and HA Carry of the same operands come out of one HA box.
+
+COMB_MACROS = {'HA', 'FA', 'MUX2'}
+SEQ_MACROS  = {'DFF', 'TFF', 'JKFF', 'SRLATCH'}
+MACRO_GATES = COMB_MACROS | SEQ_MACROS
+
+
+def split_target(target_gates):
+    """Split a target_gates list into (combinational_part, sequential_macros)."""
+    if not target_gates:
+        return None, []
+    up   = [g.upper() for g in target_gates]
+    seq  = [g for g in up if g in SEQ_MACROS]
+    comb = [g for g in up if g not in SEQ_MACROS]
+    return (comb or None), seq
+
+
+def _macroify_adders(n, macros):
+    """
+    Rewrite XOR/AND (and OR, for FA) sub-trees into adder-macro output pins.
+    Anything the macro can't express stays as a primitive glue gate — the
+    user explicitly allows mixing, which is what makes this universal.
+    """
+    t = n[0]
+    if t in ('VAR', 'CONST'):
+        return n
+    if t == 'NOT':
+        return ('NOT', _macroify_adders(n[1], macros))
+    L = _macroify_adders(n[1], macros)
+    R = _macroify_adders(n[2], macros)
+    use_ha = 'HA' in macros
+    if t == 'XOR':
+        return (('MPIN', 'HA', 0, (L, R)) if use_ha
+                else ('MPIN', 'FA', 0, (L, R, ('CONST', 0))))
+    if t == 'AND':
+        return (('MPIN', 'HA', 1, (L, R)) if use_ha
+                else ('MPIN', 'FA', 1, (L, R, ('CONST', 0))))
+    if t == 'OR' and not use_ha and 'FA' in macros:
+        # majority(a, b, 1) = a | b  ->  FA carry-out with Cin tied to 1
+        return ('MPIN', 'FA', 1, (L, R, ('CONST', 1)))
+    return (t, L, R)
+
+
+def _cofactor(n, var, val):
+    """Substitute var := val (0/1) into the AST."""
+    t = n[0]
+    if t == 'VAR':
+        return ('CONST', val) if n[1] == var else n
+    if t == 'CONST':
+        return n
+    if t == 'NOT':
+        return ('NOT', _cofactor(n[1], var, val))
+    return (t, _cofactor(n[1], var, val), _cofactor(n[2], var, val))
+
+
+def _const_fold(n):
+    """Fold constants in a basic-gate AST (AND/OR/XOR/NOT/VAR/CONST)."""
+    t = n[0]
+    if t in ('VAR', 'CONST'):
+        return n
+    if t == 'NOT':
+        c = _const_fold(n[1])
+        if c[0] == 'CONST':
+            return ('CONST', 1 - c[1])
+        if c[0] == 'NOT':
+            return c[1]
+        return ('NOT', c)
+    L, R = _const_fold(n[1]), _const_fold(n[2])
+    for a, b in ((L, R), (R, L)):
+        if a[0] == 'CONST':
+            v = a[1]
+            if t == 'AND':
+                return b if v else ('CONST', 0)
+            if t == 'OR':
+                return ('CONST', 1) if v else b
+            if t == 'XOR':
+                return _const_fold(('NOT', b)) if v else b
+    return (t, L, R)
+
+
+def _to_mux_tree(n):
+    """
+    Shannon expansion: f = MUX2(f|v=0, f|v=1, sel=v). A 2:1 mux with
+    constants is functionally complete, so ANY truth table reduces to a
+    tree of MUX2 blocks — no other gate needed.
+    """
+    variables = []
+    _collect_vars(n, variables)
+
+    def rec(node, vs):
+        node = _const_fold(node)
+        if node[0] in ('CONST', 'VAR'):
+            return node
+        # Skip variables the node no longer depends on.
+        while vs:
+            v = vs[0]
+            f0 = _const_fold(_cofactor(node, v, 0))
+            f1 = _const_fold(_cofactor(node, v, 1))
+            if f0 == f1:
+                node = f0
+                vs = vs[1:]
+                if node[0] in ('CONST', 'VAR'):
+                    return node
+                continue
+            return ('MPIN', 'MUX2', 0,
+                    (rec(f0, vs[1:]), rec(f1, vs[1:]), ('VAR', v)))
+        return node
+    return rec(n, variables)
+
+
 def _restrict_to(node, allowed):
     """Generic restriction. If a gate type is not allowed, expand it."""
     allowed = {g.upper() for g in allowed}
+
+    # Macro building blocks first. Sequential macros are handled as an
+    # output register stage by the caller — strip them here.
+    comb_macros = allowed & COMB_MACROS
+    allowed -= MACRO_GATES
+    if comb_macros:
+        n = _expand_to_basic(node)
+        if {'HA', 'FA'} & comb_macros:
+            return _macroify_adders(n, comb_macros)
+        return _to_mux_tree(n)
+    if not allowed:
+        # Only sequential macros were selected: the combinational core is
+        # unrestricted (default gates); the caller adds the register stage.
+        return node
+
     if 'NAND' in allowed and len(allowed) == 1:
         return _to_nand_only(node)
     if 'NOR' in allowed and len(allowed) == 1:
@@ -396,15 +538,16 @@ class _Builder:
         self.gates.append(g)
         return gid
 
-    def _wire(self, src, dst, to_pin):
+    def _wire(self, src, dst, to_pin, from_pin=0):
         wid = f"w{next(self._wid)}"
         self.wires.append({
             'id': wid,
-            'from_gate': src, 'from_pin': 0,
+            'from_gate': src, 'from_pin': from_pin,
             'to_gate':   dst, 'to_pin':   to_pin,
         })
 
     def emit(self, node):
+        """Emit gates/wires for `node`. Returns (gate_id, output_pin)."""
         key = node
         if key in self._cache:
             return self._cache[key]
@@ -415,31 +558,72 @@ class _Builder:
             if name not in self.var_to_gate:
                 gid = self._new_gate('INPUT', label=name, value=0)
                 self.var_to_gate[name] = gid
-            self._cache[key] = self.var_to_gate[name]
-            return self.var_to_gate[name]
+            self._cache[key] = (self.var_to_gate[name], 0)
+            return self._cache[key]
         if t == 'CONST':
             v = node[1]
             if v not in self.const_gate:
-                gid = self._new_gate('INPUT', label=f"const_{v}", value=v)
+                # VCC/GND, not INPUT: constants must not show up as K-map /
+                # truth-table variables or be toggleable by the user.
+                gid = self._new_gate('VCC' if v else 'GND',
+                                     label='1' if v else '0')
                 self.const_gate[v] = gid
-            self._cache[key] = self.const_gate[v]
-            return self.const_gate[v]
+            self._cache[key] = (self.const_gate[v], 0)
+            return self._cache[key]
 
         if t == 'NOT':
-            src_id = self.emit(node[1])
-            gid    = self._new_gate('NOT')
-            self._wire(src_id, gid, 0)
-            self._cache[key] = gid
-            return gid
+            src = self.emit(node[1])
+            gid = self._new_gate('NOT')
+            self._wire(src[0], gid, 0, src[1])
+            self._cache[key] = (gid, 0)
+            return self._cache[key]
+
+        if t == 'MPIN':
+            # ('MPIN', macro_type, out_pin, (children...)) — one shared
+            # macro instance per (macro_type, children) so e.g. the HA Sum
+            # and HA Carry of the same operands come from the same box.
+            _, mtype, out_pin, children = node
+            inst_key = ('MINST', mtype, children)
+            if inst_key in self._cache:
+                gid = self._cache[inst_key]
+            else:
+                srcs = [self.emit(c) for c in children]
+                gid  = self._new_gate(mtype)
+                for pin, src in enumerate(srcs):
+                    self._wire(src[0], gid, pin, src[1])
+                self._cache[inst_key] = gid
+            self._cache[key] = (gid, out_pin)
+            return self._cache[key]
 
         # binary
         a = self.emit(node[1])
         b = self.emit(node[2])
         gid = self._new_gate(t)
-        self._wire(a, gid, 0)
-        self._wire(b, gid, 1)
-        self._cache[key] = gid
-        return gid
+        self._wire(a[0], gid, 0, a[1])
+        self._wire(b[0], gid, 1, b[1])
+        self._cache[key] = (gid, 0)
+        return self._cache[key]
+
+
+def attach_seq_stage(b, src, macro, clk_gid):
+    """
+    Register the combinational signal `src` = (gate_id, pin) through a
+    storage macro before it reaches the OUTPUT gate.
+      DFF: D=f, CLK         TFF: T=f, CLK
+      JKFF: J=f, K=~f, CLK  SRLATCH: S=f, R=~f
+    Returns the macro's Q as (gate_id, 0).
+    """
+    gid = b._new_gate(macro)
+    b._wire(src[0], gid, 0, src[1])
+    if macro in ('JKFF', 'SRLATCH'):
+        inv = b._new_gate('NOT')
+        b._wire(src[0], inv, 0, src[1])
+        b._wire(inv, gid, 1)
+    if macro == 'JKFF':
+        b._wire(clk_gid, gid, 2)
+    elif macro in ('DFF', 'TFF'):
+        b._wire(clk_gid, gid, 1)
+    return (gid, 0)
 
 
 def _layout(circuit):
@@ -491,16 +675,26 @@ class BooleanSynthesizer:
         ast = parse_expression(expression)
 
         used_target = None
+        seq = []
         if target_gates:
-            ast = _restrict_to(ast, target_gates)
             used_target = [g.upper() for g in target_gates]
+            comb, seq = split_target(target_gates)
+            if comb:
+                ast = _restrict_to(ast, comb)
 
         b = _Builder()
-        root_id = b.emit(ast)
+        root = b.emit(ast)
+
+        # Sequential macro selected: register the output through it.
+        if seq:
+            clk = None
+            if seq[0] in ('DFF', 'TFF', 'JKFF'):
+                clk = b._new_gate('CLOCK', label='CLK')
+            root = attach_seq_stage(b, root, seq[0], clk)
 
         # Ensure there's at least one OUTPUT gate driven by the root.
         out_id = b._new_gate('OUTPUT', label=output_label)
-        b._wire(root_id, out_id, 0)
+        b._wire(root[0], out_id, 0, root[1])
 
         circuit = {'gates': b.gates, 'wires': b.wires}
         _layout(circuit)
@@ -508,7 +702,7 @@ class BooleanSynthesizer:
         info = {
             'expression':   expression,
             'gate_count':   sum(1 for g in b.gates if g['type'] not in
-                                ('INPUT', 'OUTPUT', 'CLOCK')),
+                                ('INPUT', 'OUTPUT', 'CLOCK', 'VCC', 'GND')),
             'wire_count':   len(b.wires),
             'input_vars':   [g['label'] for g in b.gates if g['type'] == 'INPUT'
                              and not g.get('label', '').startswith('const_')],

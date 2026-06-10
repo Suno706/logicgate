@@ -79,7 +79,13 @@ export default function App() {
     // If the host kicks us, jump back to a private session.
     const offKicked = collab.onKicked((info) => {
       alert(`You were removed from room ${info.room}.\n${info.reason || ""}`);
-      try { localStorage.removeItem("logicgate.session_id"); } catch { /* */ }
+      // The room id lives in sessionStorage (per-tab) — clearing only
+      // localStorage used to leave the tab in the room after reload, so
+      // the "kicked" user simply rejoined. Clear both.
+      try {
+        sessionStorage.removeItem("logicgate.session_id");
+        localStorage.removeItem("logicgate.session_id");
+      } catch { /* */ }
       const url = new URL(window.location.href);
       url.searchParams.delete("room");
       window.location.href = url.toString();

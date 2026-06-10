@@ -6,7 +6,8 @@ import type { Gate } from "../types";
 
 export function KmapPanel() {
   const { circuit } = useCircuitState();
-  const allIns = circuit.gates.filter((g) => g.type === "INPUT" || g.type === "CLOCK");
+  const allIns = circuit.gates.filter((g) =>
+    (g.type === "INPUT" || g.type === "CLOCK") && !(g.label || "").startsWith("const_"));
   const outs   = circuit.gates.filter((g) => g.type === "OUTPUT" || g.type === "LED");
 
   const [loading, setLoading] = useState(false);
@@ -33,7 +34,9 @@ export function KmapPanel() {
           // K-map renders 2-var minimum; pad with the user's other input
           // (next not-yet-included input) so the map still shows.
           const filler = circuit.gates.find(
-            (g) => (g.type === "INPUT" || g.type === "CLOCK") && g.id !== reachable[0].id
+            (g) => (g.type === "INPUT" || g.type === "CLOCK")
+              && g.id !== reachable[0].id
+              && !(g.label || "").startsWith("const_")
           );
           if (filler) reachable.push(filler);
           else {
@@ -235,7 +238,9 @@ function KmapTable({ n, inNames, outMap }: { n: number; inNames: string[]; outMa
   }
 
   if (n === 5) {
-    // 5-var: two 4-var K-maps side by side, one for inNames[0]=0, one for =1
+    // 5-var: two 4-var K-maps side by side, one for inNames[0]=0, one for =1.
+    // Minterm bit layout (MSB-first): inNames[0]=bit4 (fixed page),
+    // rows inNames[1..2]=bits 3..2, cols inNames[3..4]=bits 1..0.
     return (
       <div className="flex gap-3 overflow-x-auto">
         {[0, 1].map((e) => (
@@ -245,7 +250,7 @@ function KmapTable({ n, inNames, outMap }: { n: number; inNames: string[]; outMa
             </div>
             <Map4 rowVars={[inNames[1], inNames[2]]}
                   colVars={[inNames[3], inNames[4]]}
-                  rowsOffset={4} colsOffset={2}
+                  rowsOffset={3} colsOffset={1}
                   fixedMask={1 << 4} fixedBits={e << 4} />
           </div>
         ))}
@@ -253,7 +258,8 @@ function KmapTable({ n, inNames, outMap }: { n: number; inNames: string[]; outMa
     );
   }
 
-  // n === 6 — 2×2 grid of 4-var maps, fixed by (inNames[0], inNames[1])
+  // n === 6 — 2×2 grid of 4-var maps, fixed by (inNames[0], inNames[1]).
+  // Pages inNames[0..1]=bits 5..4, rows bits 3..2, cols bits 1..0.
   return (
     <div className="grid grid-cols-2 gap-3 overflow-x-auto">
       {[0, 1].map((e0) => (
@@ -264,7 +270,7 @@ function KmapTable({ n, inNames, outMap }: { n: number; inNames: string[]; outMa
             </div>
             <Map4 rowVars={[inNames[2], inNames[3]]}
                   colVars={[inNames[4], inNames[5]]}
-                  rowsOffset={5} colsOffset={3}
+                  rowsOffset={3} colsOffset={1}
                   fixedMask={(1 << 5) | (1 << 4)}
                   fixedBits={(e0 << 5) | (e1 << 4)} />
           </div>

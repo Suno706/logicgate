@@ -106,6 +106,35 @@ def _init_schema(conn: sqlite3.Connection):
             conn.execute(col_sql)
         except Exception:
             pass  # already exists
+
+    # Migrate the legacy rooms table: it had `created_by INTEGER` with a
+    # FOREIGN KEY to users(id), but session ids are strings ("s_x1y2",
+    # "user_bob", "room_abc") — every INSERT from generate_room_code()
+    # failed with "FOREIGN KEY constraint failed", so nobody could create
+    # rooms at all. Rebuild without the FK and with TEXT created_by.
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='rooms'"
+    ).fetchone()
+    if row and "FOREIGN KEY" in (row[0] or ""):
+        conn.executescript("""
+            PRAGMA foreign_keys=OFF;
+            ALTER TABLE rooms RENAME TO rooms_legacy;
+            CREATE TABLE rooms (
+                code          TEXT PRIMARY KEY,
+                created_by    TEXT,
+                created_at    REAL NOT NULL,
+                last_used_at  REAL NOT NULL,
+                max_users     INTEGER DEFAULT 10,
+                owner_token   TEXT
+            );
+            INSERT INTO rooms (code, created_by, created_at, last_used_at,
+                               max_users, owner_token)
+                SELECT code, CAST(created_by AS TEXT), created_at,
+                       last_used_at, max_users, owner_token
+                FROM rooms_legacy;
+            DROP TABLE rooms_legacy;
+            PRAGMA foreign_keys=ON;
+        """)
     conn.commit()
 
 

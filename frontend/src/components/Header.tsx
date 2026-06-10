@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   MousePointer2, Spline, Hand, Undo2, Redo2, Trash2, Square,
   Grid3x3, Play, StopCircle, Save, FolderOpen, Wifi, WifiOff,
-  Loader2, X, Maximize2, Users, BookOpen, Sun, Moon,
+  Loader2, X, Maximize2, Users, BookOpen, Sun, Moon, LogIn,
 } from "lucide-react";
 import { getTheme, toggleTheme } from "../theme";
 import type { Tool } from "../types";
@@ -37,26 +37,53 @@ interface BtnProps {
 
 function UserChip() {
   const name = getDisplayName();
+  const room = getRoomCode();
+
+  // Signed in: avatar + name, click to sign out.
+  if (name) {
+    return (
+      <button
+        onClick={() => {
+          if (confirm(`Sign out ${name}? You'll be sent back to the sign-in screen.`)) {
+            signOut();
+          }
+        }}
+        title={`Signed in as ${name}${room ? ` — in room ${room}` : ""} — click to sign out`}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md ml-2 text-[10px] font-mono font-semibold border border-accent/40 text-accent hover:bg-accent/10 transition-all flex-shrink-0"
+      >
+        <div className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] bg-accent/20 text-accent">
+          {name[0].toUpperCase()}
+        </div>
+        <span className="hidden lg:block max-w-24 truncate">{name}</span>
+      </button>
+    );
+  }
+
+  // Guest in a room: the room IS the identity — show it instead of "guest".
+  if (room) {
+    return (
+      <div
+        title={`Working in shared room ${room} (guest)`}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md ml-2 text-[10px] font-mono font-semibold border border-ok/40 text-ok flex-shrink-0"
+      >
+        <Users size={11} />
+        <span className="hidden lg:block">{room}</span>
+      </div>
+    );
+  }
+
+  // Anonymous solo guest: a clean Sign-in call-to-action, no "g guest" blob.
   return (
     <button
       onClick={() => {
-        if (confirm(`Sign out ${name || "guest"}? You'll be sent back to the sign-in screen.`)) {
-          signOut();
-        }
+        try { localStorage.removeItem("logicgate.signin_seen"); } catch { /* */ }
+        window.location.reload();
       }}
-      title={name ? `Signed in as ${name} — click to sign out` : "Guest mode — click to switch identity"}
-      className={`flex items-center gap-1.5 px-2 py-1 rounded-md ml-2 text-[10px] font-mono font-semibold border transition-all ${
-        name
-          ? "border-accent/40 text-accent hover:bg-accent/10"
-          : "border-bg-600 text-gray-500 hover:text-gray-300 hover:bg-bg-700"
-      }`}
+      title="You're in guest mode — sign in to sync circuits across devices"
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md ml-2 text-[10px] font-mono font-semibold border border-bg-600 text-gray-400 hover:text-accent hover:border-accent/50 transition-all flex-shrink-0"
     >
-      <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] ${
-        name ? "bg-accent/20 text-accent" : "bg-bg-600 text-gray-500"
-      }`}>
-        {name ? name[0].toUpperCase() : "g"}
-      </div>
-      <span className="hidden lg:block">{name || "guest"}</span>
+      <LogIn size={11} />
+      <span className="hidden lg:block">Sign in</span>
     </button>
   );
 }

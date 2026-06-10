@@ -34,12 +34,29 @@ _GATE_TOKEN_MAP = {
     'nand': 'NAND',
     'nor':  'NOR',
     'xnor': 'XNOR',
+    # Macro building blocks — boolean_synth composes ANY function from
+    # these mixed with glue gates (HA/FA pins, MUX Shannon expansion,
+    # FF/latch output registration).
+    'half adder': 'HA',   'ha': 'HA',
+    'full adder': 'FA',   'fa': 'FA',   'adder': 'FA', 'adders': 'FA',
+    'd flip flop': 'DFF', 'dff': 'DFF',
+    'flip flop': 'DFF',   'flip flops': 'DFF',
+    't flip flop': 'TFF', 'tff': 'TFF',
+    'jk flip flop': 'JKFF', 'jkff': 'JKFF',
+    'sr latch': 'SRLATCH', 'srlatch': 'SRLATCH',
+    'latch': 'SRLATCH',   'latches': 'SRLATCH',
+    'd latch': 'DFF',
+    'mux': 'MUX2', 'mux2': 'MUX2', 'multiplexer': 'MUX2',
 }
 _GATE_TOKEN_RE = (
     # Optional trailing " gate" / " gates" so "AND gate", "NOT gates" are
     # parsed as the gate token itself (not "AND" + filler word "gate"). Lets
     # phrases like "using not gate and gate" extract both NOT and AND.
-    r'(?:nand|nor|xnor|xor|inverter|inv|and|or|not)(?:\s+gates?)?'
+    # Multi-word macro names come first so 'full adder' wins over 'adder'.
+    r'(?:half\s+adder|full\s+adder|d\s+flip\s+flop|t\s+flip\s+flop|'
+    r'jk\s+flip\s+flop|sr\s+latch|d\s+latch|flip\s+flops?|adders?|'
+    r'latch(?:es)?|multiplexer|mux2|mux|ha|fa|dff|tff|jkff|srlatch|'
+    r'nand|nor|xnor|xor|inverter|inv|and|or|not)(?:\s+(?:gates?|blocks?))?'
 )
 # A gate-list is one or more gate tokens joined by separators (and / , / / / +).
 _GATE_LIST_RE = (
@@ -103,8 +120,8 @@ def _parse_target(text: str):
             filtered = []
             for i, tok in enumerate(tokens):
                 low = tok.lower().strip()
-                # Strip trailing " gate(s)" before classifying.
-                bare = re.sub(r'\s+gates?$', '', low).strip()
+                # Strip trailing " gate(s)" / " block(s)" before classifying.
+                bare = re.sub(r'\s+(?:gates?|blocks?)$', '', low).strip()
                 if (bare in ('and', 'or')
                         and 0 < i < len(tokens) - 1
                         and not tok.isupper()
@@ -112,7 +129,8 @@ def _parse_target(text: str):
                     continue   # separator
                 filtered.append(tok)
             for tok in filtered:
-                key = re.sub(r'\s+gates?$', '', tok.lower()).strip()
+                key = re.sub(r'\s+(?:gates?|blocks?)$', '', tok.lower()).strip()
+                key = re.sub(r'\s+', ' ', key)
                 g = _GATE_TOKEN_MAP.get(key)
                 if g and g not in seen:
                     seen.add(g)
@@ -3271,6 +3289,18 @@ class QuestionSolver:
                     ],
                 }
 
+        # 0a-pre0. Curated composition templates ("4 bit adder using full
+        # adder", "full adder using half adder") matched against the FULL
+        # text: _parse_target may have moved "using full adder" into
+        # `target`, so t_body no longer contains the phrase. Hand-crafted
+        # compositions beat generic macro synthesis when one exists.
+        for name, factory in sorted(RAW_TEMPLATES.items(),
+                                    key=lambda kv: -len(kv[0])):
+            if ' using ' not in name and ' from ' not in name:
+                continue
+            if re.search(rf'\b{re.escape(name)}\b', t):
+                return self._raw_template_answer(name, factory)
+
         # 0a-pre. Detect "X using <sub-block>" where the combination has NO
         # known composition recipe. Without this, "adder using flip flop"
         # silently falls through to the parametric/boolean path and the
@@ -3353,38 +3383,7 @@ class QuestionSolver:
         for name, factory in sorted(RAW_TEMPLATES.items(),
                                     key=lambda kv: -len(kv[0])):
             if re.search(rf'\b{re.escape(name)}\b', t_body):
-                circuit = factory()
-                gates = circuit['gates']
-                wires = circuit['wires']
-                n_logic = sum(1 for g in gates
-                              if g['type'] not in ('INPUT', 'OUTPUT', 'CLOCK'))
-                outs = [g['label'] for g in gates if g['type'] == 'OUTPUT']
-                info = {
-                    'gate_count': n_logic,
-                    'wire_count': len(wires),
-                    'input_vars': [g['label'] for g in gates
-                                   if g['type'] == 'INPUT'],
-                    'outputs':    outs,
-                    'target_gates': None,
-                    'sequential': True,
-                }
-                return {
-                    'answer':     f"Built **{name}**  -  {n_logic} logic gate"
-                                  f"{'s' if n_logic != 1 else ''}, "
-                                  f"{len(wires)} wires, {len(outs)} outputs. "
-                                  f"This circuit has feedback (a loop), so "
-                                  f"static simulation can't show its dynamic "
-                                  f"behaviour  -  toggle the inputs to study "
-                                  f"the structure.",
-                    'confidence': 0.9,
-                    'circuit':    circuit,
-                    'info':       info,
-                    'details':    info,
-                    'suggestions': [
-                        "Toggle S and R to study the latch states.",
-                        "Use a CLOCK on the enable/CLK input for sequential timing.",
-                    ],
-                }
+                return self._raw_template_answer(name, factory)
 
         # 1a. Multi-output known circuits (half adder, full adder, ...).
         #     Sort longest-name-first so specific phrases like
@@ -3896,29 +3895,72 @@ class QuestionSolver:
             ],
         }
 
+    def _raw_template_answer(self, name, factory):
+        """Shared response builder for hand-crafted RAW_TEMPLATES circuits."""
+        circuit = factory()
+        gates = circuit['gates']
+        wires = circuit['wires']
+        n_logic = sum(1 for g in gates
+                      if g['type'] not in ('INPUT', 'OUTPUT', 'CLOCK'))
+        outs = [g['label'] for g in gates if g['type'] == 'OUTPUT']
+        info = {
+            'gate_count': n_logic,
+            'wire_count': len(wires),
+            'input_vars': [g['label'] for g in gates
+                           if g['type'] == 'INPUT'],
+            'outputs':    outs,
+            'target_gates': None,
+            'sequential': True,
+        }
+        return {
+            'answer':     f"Built **{name}**  -  {n_logic} logic gate"
+                          f"{'s' if n_logic != 1 else ''}, "
+                          f"{len(wires)} wires, {len(outs)} outputs. "
+                          f"This circuit has feedback (a loop), so "
+                          f"static simulation can't show its dynamic "
+                          f"behaviour  -  toggle the inputs to study "
+                          f"the structure.",
+            'confidence': 0.9,
+            'circuit':    circuit,
+            'info':       info,
+            'details':    info,
+            'suggestions': [
+                "Toggle S and R to study the latch states.",
+                "Use a CLOCK on the enable/CLK input for sequential timing.",
+            ],
+        }
+
     def _build_multi_output(self, parts, target):
         """
         Build one circuit with shared inputs and several OUTPUT gates.
         `parts` is a list of (label, expression).
         """
-        from .boolean_synth import _Builder, parse_expression, _restrict_to, _layout
+        from .boolean_synth import (_Builder, parse_expression, _restrict_to,
+                                    _layout, split_target, attach_seq_stage)
 
+        comb, seq = split_target(target)
         b = _Builder()
-        gate_count_logic = 0
+        clk = None
         for label, expr in parts:
             ast = parse_expression(expr)
-            if target:
-                ast = _restrict_to(ast, target)
-            root_id = b.emit(ast)
-            out_id  = b._new_gate('OUTPUT', label=label)
-            b._wire(root_id, out_id, 0)
+            if comb:
+                ast = _restrict_to(ast, comb)
+            root = b.emit(ast)
+            # Sequential macro restriction: register every output through
+            # the storage element, all sharing one CLK.
+            if seq:
+                if clk is None and seq[0] in ('DFF', 'TFF', 'JKFF'):
+                    clk = b._new_gate('CLOCK', label='CLK')
+                root = attach_seq_stage(b, root, seq[0], clk)
+            out_id = b._new_gate('OUTPUT', label=label)
+            b._wire(root[0], out_id, 0, root[1])
 
         circuit = {'gates': b.gates, 'wires': b.wires}
         _layout(circuit)
 
         info = {
             'gate_count':   sum(1 for g in b.gates if g['type'] not in
-                                ('INPUT', 'OUTPUT', 'CLOCK')),
+                                ('INPUT', 'OUTPUT', 'CLOCK', 'VCC', 'GND')),
             'wire_count':   len(b.wires),
             'input_vars':   [g['label'] for g in b.gates if g['type'] == 'INPUT'
                              and not g.get('label', '').startswith('const_')],

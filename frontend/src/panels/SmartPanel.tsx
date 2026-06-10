@@ -405,7 +405,22 @@ function BuildTab({ circuit, dispatch }: { circuit?: any; dispatch: any }) {
         "4 bit ring counter",
     ]},
   ];
+  // Universal primitive gates (any truth table can be built from these).
   const GATE_OPTIONS = ["NAND", "NOR", "AND", "OR", "NOT", "XOR", "XNOR"];
+  // Macro / sub-block restrictions. The backend composes ANY truth table
+  // from these mixed with glue gates: HA/FA pins implement the XOR/AND/OR
+  // terms of the synthesized logic, MUX2 uses Shannon expansion (universal
+  // on its own), and FF/latch selections register every output through the
+  // storage element with a shared CLK.
+  const MACRO_OPTIONS: { id: string; label: string }[] = [
+    { id: "HA",      label: "HA"      },
+    { id: "FA",      label: "FA"      },
+    { id: "MUX2",    label: "2:1 MUX" },
+    { id: "DFF",     label: "D-FF"    },
+    { id: "TFF",     label: "T-FF"    },
+    { id: "JKFF",    label: "JK-FF"   },
+    { id: "SRLATCH", label: "SR latch"},
+  ];
 
   async function build(question: string) {
     const q2 = question.trim();
@@ -972,7 +987,7 @@ function BuildTab({ circuit, dispatch }: { circuit?: any; dispatch: any }) {
           {/* Always-visible gate restriction */}
           <div>
             <label className="text-[9px] font-mono text-gray-500 block mb-1">
-              Restrict to gates (optional)
+              Restrict / build from (optional)
             </label>
             <div className="flex flex-wrap gap-1">
               {GATE_OPTIONS.map((g) => (
@@ -986,6 +1001,24 @@ function BuildTab({ circuit, dispatch }: { circuit?: any; dispatch: any }) {
                   }`}
                 >
                   {g}
+                </button>
+              ))}
+            </div>
+            {/* Macro building blocks — same picker, composed by the backend
+                with glue gates so any truth table stays buildable. */}
+            <div className="flex flex-wrap gap-1 mt-1">
+              {MACRO_OPTIONS.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => toggleGate(m.id)}
+                  title={`Compose the circuit from ${m.label} blocks (+ glue gates where needed)`}
+                  className={`px-2 py-0.5 rounded text-[9px] font-mono border transition-all ${
+                    sGates.includes(m.id)
+                      ? "bg-accent/25 border-accent text-accent"
+                      : "bg-bg-800 border-bg-600 text-gray-500 hover:border-gray-500"
+                  }`}
+                >
+                  {m.label}
                 </button>
               ))}
             </div>

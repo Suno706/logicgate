@@ -65,6 +65,49 @@ interface ChatMsg {
   feedback?: "up" | "down" | null;
 }
 
+/**
+ * Renders the actual scikit-learn model details returned from the backend.
+ * Proves to the user that real ML (not predefined templates) ran their
+ * request — addresses 'it feels like predefined data' feedback.
+ */
+function MLModelCard({ model }: { model: any }) {
+  if (!model) return null;
+  const detail = (k: string) => (model[k] !== undefined && model[k] !== null) ? String(model[k]) : null;
+  const hidden = model.hidden_layer_sizes;
+  return (
+    <div className="bg-bg-700/60 border border-accent/30 rounded p-2 text-[9px] font-mono mt-2">
+      <div className="text-[8px] uppercase tracking-widest text-accent mb-1">
+        ML model ran this
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+        <div className="text-gray-500">name</div>
+        <div className="text-gray-200">{model.name}</div>
+        <div className="text-gray-500">class</div>
+        <div className="text-gray-200">{model.class || model.model_class || "?"}</div>
+        <div className="text-gray-500">library</div>
+        <div className="text-gray-200">{model.library || "scikit-learn"}</div>
+        {detail("n_estimators") && (<>
+          <div className="text-gray-500">n_estimators</div>
+          <div className="text-gray-200">{model.n_estimators}</div>
+        </>)}
+        {hidden && (<>
+          <div className="text-gray-500">hidden_layers</div>
+          <div className="text-gray-200">{Array.isArray(hidden) ? hidden.join(" → ") : String(hidden)}</div>
+        </>)}
+        {detail("n_features_in_") && (<>
+          <div className="text-gray-500">features</div>
+          <div className="text-gray-200">{model.n_features_in_}</div>
+        </>)}
+        {detail("n_keys") && (<>
+          <div className="text-gray-500">prob_keys</div>
+          <div className="text-gray-200">{model.n_keys}</div>
+        </>)}
+      </div>
+      {model.note && <div className="text-gray-600 mt-1 text-[8px]">{model.note}</div>}
+    </div>
+  );
+}
+
 function AskTab({ circuit, dispatch }: { circuit: any; dispatch: any }) {
   const [q, setQ]           = useState("");
   const [loading, setL]     = useState(false);
@@ -392,7 +435,100 @@ function BuildTab({ circuit, dispatch }: { circuit?: any; dispatch: any }) {
     } finally { setL(false); }
   }
 
+  /**
+   * Detect whether the per-output truth-table bits match a known macro
+   * pattern (HA / FA / D-FF behaviour table / etc.). Returns the macro spec
+   * if matched, null otherwise.
+   *
+   *   Half adder:  2 inputs, 2 outputs.  Y1 = A^B, Y2 = A&B
+   *   Full adder:  3 inputs, 2 outputs.  Y1 = A^B^C, Y2 = (A&B)|(B&C)|(A&C)
+   */
+  function detectMacroFromBits(nIn: number, bits: (0 | 1)[][]):
+    | { type: string; layout: { in: string[]; out: string[]; clk?: boolean } }
+    | null {
+    const nOut = bits[0]?.length ?? 0;
+    const eq = (col: number, fn: (mask: number) => 0 | 1) => {
+      for (let m = 0; m < (1 << nIn); m++) {
+        if ((bits[m]?.[col] ?? 0) !== fn(m)) return false;
+      }
+      return true;
+    };
+    // Half adder
+    if (nIn === 2 && nOut === 2) {
+      const xor = (m: number): 0 | 1 => (((m >> 1) & 1) ^ (m & 1)) as 0 | 1;
+      const and = (m: number): 0 | 1 => (((m >> 1) & 1) & (m & 1)) as 0 | 1;
+      if ((eq(0, xor) && eq(1, and)) || (eq(0, and) && eq(1, xor))) {
+        return { type: "HA", layout: { in: ["A","B"], out: ["Sum","Cout"] } };
+      }
+    }
+    // Full adder
+    if (nIn === 3 && nOut === 2) {
+      const a = (m: number) => (m >> 2) & 1, b = (m: number) => (m >> 1) & 1, c = (m: number) => m & 1;
+      const sum = (m: number): 0 | 1 => (a(m) ^ b(m) ^ c(m)) as 0 | 1;
+      const cout = (m: number): 0 | 1 => (((a(m) & b(m)) | (b(m) & c(m)) | (a(m) & c(m)))) as 0 | 1;
+      if ((eq(0, sum) && eq(1, cout)) || (eq(0, cout) && eq(1, sum))) {
+        return { type: "FA", layout: { in: ["A","B","Cin"], out: ["Sum","Cout"] } };
+      }
+    }
+    return null;
+  }
+
+  /** Same idea for the Boolean-mode per-output expressions: try to match
+   *  HA/FA by comparing the expressions string-wise after normalisation. */
+  function detectMacroFromBooleans(nIn: number, exprs: string[]):
+    | { type: string; layout: { in: string[]; out: string[]; clk?: boolean } }
+    | null {
+    const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+    const set = exprs.map(norm).filter((x) => x);
+    if (nIn === 2 && set.length === 2) {
+      const xor = "a^b";    const and = "a&b";
+      if ((set[0] === xor && set[1] === and) || (set[0] === and && set[1] === xor)
+        || (set[0] === "(a^b)" && set[1] === "(a&b)")) {
+        return { type: "HA", layout: { in: ["A","B"], out: ["Sum","Cout"] } };
+      }
+    }
+    if (nIn === 3 && set.length === 2) {
+      const sum = "a^b^c";
+      const cout1 = "(a&b)|(b&c)|(a&c)";
+      const cout2 = "(a&b)|(a&c)|(b&c)";
+      if ((set[0] === sum && (set[1] === cout1 || set[1] === cout2))
+        || (set[1] === sum && (set[0] === cout1 || set[0] === cout2))) {
+        return { type: "FA", layout: { in: ["A","B","Cin"], out: ["Sum","Cout"] } };
+      }
+    }
+    return null;
+  }
+
   function buildFromStruct() {
+    // Macro auto-detection (Truth Table / Boolean modes): if the user's spec
+    // matches a known sub-block, give them the option to drop the single
+    // macro instead of expanding to gates.
+    if (sMode === "truth") {
+      const macro = detectMacroFromBits(tInputs, tBits);
+      if (macro && confirm(
+        `Your truth table matches a ${macro.type === "HA" ? "Half Adder" : "Full Adder"}.\n` +
+        `\nClick OK to drop a single ${macro.type} macro block (with INPUT/OUTPUT wired).` +
+        `\nClick Cancel to build it from primitive gates instead.`
+      )) {
+        insertWorkingMacro(macro.type, macro.layout);
+        setShowStruct(false);
+        return;
+      }
+    }
+    if (sMode === "expr") {
+      const cleaned = bExprs.slice(0, bOutputs).map((e) => e.trim()).filter(Boolean);
+      const macro = detectMacroFromBooleans(bInputs, cleaned);
+      if (macro && confirm(
+        `Your expressions match a ${macro.type === "HA" ? "Half Adder" : "Full Adder"}.\n` +
+        `\nClick OK to drop a single ${macro.type} macro block (with INPUT/OUTPUT wired).` +
+        `\nClick Cancel to build it from primitive gates instead.`
+      )) {
+        insertWorkingMacro(macro.type, macro.layout);
+        setShowStruct(false);
+        return;
+      }
+    }
+
     // Place mode: drop a single macro gate without round-tripping to the backend.
     if (sMode === "template" && sPlaceMode === "place" && canPlaceCurrent) {
       const macroType = MACRO_TYPE_BY_TEMPLATE[sTemplate];
@@ -991,6 +1127,7 @@ function SuggestTab({ circuit, dispatch }: { circuit: any; dispatch: any }) {
   const [loading, setL]   = useState(false);
   const [suggs, setSuggs] = useState<ConnectionSuggestion[]>([]);
   const [error, setErr]   = useState<string | null>(null);
+  const [mlModel, setMlModel] = useState<any>(null);
 
   const byId = new Map(circuit.gates.map((g: any) => [g.id, g]));
 
@@ -999,6 +1136,7 @@ function SuggestTab({ circuit, dispatch }: { circuit: any; dispatch: any }) {
     try {
       const r = await suggestConnection(circuit, 8);
       setSuggs(r.suggestions ?? []);
+      setMlModel((r as any).ml_model ?? null);
       if (!r.suggestions?.length) {
         // Diagnose WHY there are no suggestions instead of a vague message.
         const gateCount  = circuit.gates.length;
@@ -1070,6 +1208,8 @@ function SuggestTab({ circuit, dispatch }: { circuit: any; dispatch: any }) {
         </div>
       )}
 
+      {mlModel && <MLModelCard model={mlModel} />}
+
       {!suggs.length && !error && !loading && (
         <div className="text-[9px] text-gray-600 font-mono text-center py-4">
           Click the button above to get intelligent wire connection suggestions based on your circuit structure.
@@ -1092,12 +1232,14 @@ function FaultTab({ circuit }: { circuit: any }) {
   const [faults, setFaults] = useState<Fault[]>([]);
   const [checked, setChecked] = useState(false);
   const [error, setErr]     = useState<string | null>(null);
+  const [mlModel, setMlModel] = useState<any>(null);
 
   async function runCheck() {
     setL(true); setErr(null);
     try {
       const r = await analyzeFaults(circuit);
       setFaults(r.faults ?? []);
+      setMlModel((r as any).ml_model ?? null);
       setChecked(true);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -1130,6 +1272,10 @@ function FaultTab({ circuit }: { circuit: any }) {
           {faults.length === 0 ? "✓ No faults detected" : `✗ ${faults.length} fault${faults.length !== 1 ? "s" : ""} found`}
         </div>
       )}
+
+      {/* ML provenance card — shows actual scikit-learn model details so the
+          user can SEE that real ML (not predefined data) did this work. */}
+      {mlModel && mlModel.loaded && <MLModelCard model={mlModel} />}
 
       {(["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const).map((sev) => {
         const items = bySev[sev];
@@ -1236,6 +1382,9 @@ function MinTab({ circuit }: { circuit: any }) {
               })}
             </div>
           )}
+
+          {/* ML provenance — proves the scikit-learn model did the analysis */}
+          {result.ml_model?.loaded && <MLModelCard model={result.ml_model} />}
         </div>
       )}
 

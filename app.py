@@ -162,6 +162,28 @@ def _err(message, code=400, exc=None):
     return jsonify({'status': 'error', 'success': False, 'message': str(message)}), code
 
 
+def _model_signature(holder, friendly_name):
+    """Compact ML provenance dict for embedding in API responses so the
+    frontend can render 'model: RandomForestClassifier · 100 trees · 400k rows'."""
+    if holder is None or getattr(holder, 'model', None) is None:
+        return {'name': friendly_name, 'loaded': False}
+    m = holder.model
+    out = {'name': friendly_name, 'loaded': True,
+           'class': type(m).__name__, 'library': 'scikit-learn'}
+    for attr in ('n_estimators', 'max_depth', 'hidden_layer_sizes',
+                 'n_classes_', 'n_features_in_'):
+        v = getattr(m, attr, None)
+        if v is not None:
+            try:
+                if hasattr(v, '__iter__') and not isinstance(v, (str, bytes)):
+                    out[attr] = list(v)
+                else:
+                    out[attr] = int(v) if isinstance(v, bool) is False and hasattr(v, '__int__') else v
+            except Exception:
+                pass
+    return out
+
+
 def _ml_guard():
     """Return a 503 response if ML models haven't finished loading yet."""
     if not _ml_ready:
@@ -383,6 +405,77 @@ def health():
     })
 
 
+@app.route('/api/ml/info', methods=['GET'])
+def ml_info():
+    """Introspect the actual scikit-learn models so the UI can SHOW the user
+    that real ML is doing the work (model class, hyperparameters, dataset
+    size). Removes the "feels predefined" concern by exposing concrete
+    evidence."""
+    if (r := _ml_guard()): return r
+
+    def _model_meta(name, obj):
+        if obj is None or getattr(obj, 'model', None) is None:
+            return {'name': name, 'loaded': False}
+        m = obj.model
+        cls = type(m).__name__
+        out = {'name': name, 'loaded': True, 'model_class': cls,
+               'library': 'scikit-learn'}
+        # Common scikit-learn hyperparams worth showing.
+        for attr in ('n_estimators', 'max_depth', 'hidden_layer_sizes',
+                     'n_iter_', 'n_classes_', 'n_features_in_'):
+            v = getattr(m, attr, None)
+            if v is not None:
+                out[attr] = list(v) if hasattr(v, '__iter__') and not isinstance(v, (str, bytes)) else int(v) if isinstance(v, (int,)) else v
+        # FaultDetector / Optimizer also have scaler_
+        if hasattr(obj, 'scaler') and obj.scaler is not None:
+            out['standardized'] = True
+        return out
+
+    # Training dataset size — line count of circuit_patterns.csv.
+    import os
+    csv_path = os.path.join('data', 'circuit_patterns.csv')
+    rows = None
+    try:
+        if os.path.exists(csv_path):
+            with open(csv_path, 'rb') as f:
+                rows = sum(1 for _ in f) - 1   # minus header
+    except Exception:
+        rows = None
+
+    return jsonify({
+        'training_rows': rows,
+        'training_file': 'data/circuit_patterns.csv',
+        'models': [
+            _model_meta('fault_detector',    fault_detector),
+            _model_meta('circuit_optimizer', circuit_optimizer),
+            _model_meta('gate_minimizer',    gate_minimizer),
+        ],
+        'connection_suggester': {
+            'name': 'connection_suggester',
+            'loaded': bool(connection_suggester and connection_suggester.is_ready()),
+            'model_class': 'EmpiricalProbabilityTable',
+            'library': 'pandas + Counter',
+            'description': ('P(src_type | dst_type, pin) built from '
+                            'circuit_patterns.csv'),
+        },
+        'intent_classifier': {
+            'name': 'intent_classifier',
+            'model_class': 'TF-IDF + LogisticRegression',
+            'library': 'scikit-learn',
+            'description': ('Trained on ml_models/intent_data.py (~3.4k '
+                            'phrasings) to route NL → build / concept / '
+                            'fault / minimize / output_query.'),
+        },
+        'boolean_synth': {
+            'name': 'boolean_synth',
+            'model_class': 'Quine-McCluskey + custom parser',
+            'library': 'algorithmic',
+            'description': ('Pure algorithmic minimisation — not ML. Produces '
+                            'provably-minimal SOP for ≤12 vars.'),
+        },
+    })
+
+
 # -- Fault Detection -----------------------------------------------------------
 
 @app.route('/api/analyze/faults', methods=['POST'])
@@ -393,6 +486,8 @@ def analyze_faults():
         faults  = fault_detector.detect_faults(circuit)
         return jsonify({'status': 'success', 'fault_count': len(faults),
                         'faults': faults,
+                        'ml_model': _model_signature(fault_detector,
+                                                     'FaultDetector'),
                         'timestamp': datetime.now().isoformat()})
     except Exception as e:
         return _err(e, exc=e)
@@ -437,6 +532,8 @@ def analyze_minimize():
             'current_gate_count': stats.get('current_gate_count'),
             'efficiency_score':   stats.get('efficiency_score'),
             'benchmark':          stats.get('benchmark'),
+            'ml_model':           _model_signature(gate_minimizer,
+                                                   'GateMinimizer'),
             'timestamp':          datetime.now().isoformat(),
         })
     except Exception as e:
@@ -773,9 +870,18 @@ def suggest_connection():
         circuit = data.get('circuit', {})
         top_k   = int(data.get('top_k', 5) or 5)
         suggestions = connection_suggester.suggest(circuit, top_k=top_k)
+        n_keys = len(connection_suggester.stats) if connection_suggester.stats else 0
         return jsonify({
             'status': 'success', 'success': True,
             'suggestions': suggestions,
+            'ml_model': {
+                'name': 'ConnectionSuggester',
+                'class': 'EmpiricalProbabilityTable',
+                'library': 'pandas + Counter',
+                'n_keys': n_keys,
+                'note': f'P(src|dst,pin) over {n_keys} (dst,pin) pairs '
+                        'learned from circuit_patterns.csv',
+            },
             'timestamp':   datetime.now().isoformat(),
         })
     except Exception as e:

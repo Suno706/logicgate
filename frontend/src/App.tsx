@@ -13,6 +13,7 @@ import { ToastProvider } from "./components/Toast";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { WelcomeTour }  from "./components/WelcomeTour";
 import { SignInGate }   from "./components/SignInGate";
+import { GameScreen }   from "./game/GameScreen";
 
 /**
  * Slim vertical bar that sits between the canvas and each side panel.
@@ -57,6 +58,21 @@ export default function App() {
   const [sidebarOpen,    setSidebarOpen]    = useState(!isMobileInit);
   const [rightOpen,      setRightOpen]      = useState(!isMobileInit);
   const [isMobile,       setIsMobile]       = useState(isMobileInit);
+  const [gameOpen,       setGameOpen]       = useState(false);
+
+  // Custom event so any component can request the full-screen arcade.
+  useEffect(() => {
+    const open = () => setGameOpen(true);
+    window.addEventListener("logicgate:open-game", open);
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setGameOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("logicgate:open-game", open);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -124,6 +140,7 @@ export default function App() {
           <DispatchCtx.Provider value={dispatch}>
             <SignInGate />
             <WelcomeTour />
+            {gameOpen && <GameScreen onClose={() => setGameOpen(false)} />}
             <div className="h-screen flex flex-col overflow-hidden bg-bg-900 text-gray-200">
 
               <Header

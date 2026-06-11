@@ -5,51 +5,51 @@
 @tailwind utilities;
 
 /* ── Theme tokens (default = dark) ───────────────────────────────────────
-   Dark palette is a soft cool-grey slate (not pure black), with calm
-   indigo accent and muted semantic colors that don't vibrate. Light
-   palette is a warm off-white paper feel with the same accent family. */
+   Hand-picked palette with warm-tinted neutrals (not generic cold slate)
+   and a teal-cyan accent that says "engineering / circuit" rather than
+   "AI-default indigo". Surfaces step gently so the eye reads hierarchy. */
 :root {
-  --lg-bg-900: #0f1117;   /* app background — soft black-blue */
-  --lg-bg-800: #161922;   /* panels                          */
-  --lg-bg-700: #1d212d;   /* inputs / hover                  */
-  --lg-bg-600: #2a2f3d;   /* borders / dividers              */
-  --lg-accent:       #6366f1;   /* indigo-500 — calm, professional */
-  --lg-accent-hover: #818cf8;   /* indigo-400                      */
-  --lg-ok:   #34d399;     /* emerald-400 */
-  --lg-warn: #f59e0b;     /* amber-500   */
-  --lg-err:  #f87171;     /* red-400     */
-  --lg-fg-100: #f1f3f8;
-  --lg-fg-200: #d8dbe6;
-  --lg-fg-300: #b4b9c9;
-  --lg-fg-400: #8b91a6;
-  --lg-fg-500: #6b7186;
-  --lg-fg-600: #4a4f63;
-  --lg-fg-700: #353948;
-  --lg-scroll-track: #0f1117;
-  --lg-scroll-thumb: #2a2f3d;
-  --lg-scroll-thumb-hover: #3a4055;
+  --lg-bg-900: #14161c;   /* canvas — warm near-black with a touch of brown */
+  --lg-bg-800: #1c1f27;   /* panels — slightly lifted                       */
+  --lg-bg-700: #262932;   /* inputs / hover                                 */
+  --lg-bg-600: #353944;   /* borders / dividers                             */
+  --lg-accent:       #2dd4bf;   /* teal-400 — distinctive, signal-circuit feel */
+  --lg-accent-hover: #5eead4;   /* teal-300                                    */
+  --lg-ok:   #4ade80;     /* lively green-500 (high signal = high voltage)   */
+  --lg-warn: #fbbf24;     /* honey amber                                     */
+  --lg-err:  #fb7185;     /* warm rose, not alarming red                     */
+  --lg-fg-100: #f5efe0;   /* paper-white with a hint of cream                */
+  --lg-fg-200: #e0dccd;
+  --lg-fg-300: #b8b3a0;
+  --lg-fg-400: #8a8675;
+  --lg-fg-500: #6a6757;
+  --lg-fg-600: #4d4a3e;
+  --lg-fg-700: #383428;
+  --lg-scroll-track: #14161c;
+  --lg-scroll-thumb: #353944;
+  --lg-scroll-thumb-hover: #46495a;
 }
 
 html.light {
-  --lg-bg-900: #fafbfc;   /* warm off-white, not pure         */
-  --lg-bg-800: #f1f3f7;   /* panels                           */
-  --lg-bg-700: #e5e8ee;   /* inputs / hover                   */
-  --lg-bg-600: #cfd3dd;   /* borders                          */
-  --lg-accent:       #4f46e5;   /* indigo-600 — readable on white */
-  --lg-accent-hover: #6366f1;   /* indigo-500                     */
-  --lg-ok:   #059669;     /* emerald-600 */
-  --lg-warn: #b45309;     /* amber-700   */
-  --lg-err:  #dc2626;     /* red-600     */
-  --lg-fg-100: #0f172a;   /* slate-900   */
-  --lg-fg-200: #1e293b;
-  --lg-fg-300: #334155;
-  --lg-fg-400: #475569;
-  --lg-fg-500: #64748b;
-  --lg-fg-600: #94a3b8;
-  --lg-fg-700: #cbd5e1;
-  --lg-scroll-track: #e5e8ee;
-  --lg-scroll-thumb: #cfd3dd;
-  --lg-scroll-thumb-hover: #94a3b8;
+  --lg-bg-900: #fbf8f1;   /* parchment — cream, not pure white              */
+  --lg-bg-800: #f3efe4;   /* panels                                          */
+  --lg-bg-700: #e9e4d4;   /* inputs                                          */
+  --lg-bg-600: #d4cdb8;   /* borders                                         */
+  --lg-accent:       #0d9488;   /* teal-600 — readable on cream                */
+  --lg-accent-hover: #14b8a6;   /* teal-500                                    */
+  --lg-ok:   #16a34a;
+  --lg-warn: #b45309;
+  --lg-err:  #be123c;
+  --lg-fg-100: #1c1814;   /* dark espresso — warm dark, not slate-black     */
+  --lg-fg-200: #2d2920;
+  --lg-fg-300: #4a4538;
+  --lg-fg-400: #6b6553;
+  --lg-fg-500: #8a8472;
+  --lg-fg-600: #a8a190;
+  --lg-fg-700: #c5beaa;
+  --lg-scroll-track: #e9e4d4;
+  --lg-scroll-thumb: #c5beaa;
+  --lg-scroll-thumb-hover: #a8a190;
 }
 
 @layer base {

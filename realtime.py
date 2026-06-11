@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, List, Set
 
 from flask import request
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -44,8 +44,22 @@ log = logging.getLogger("logicgate.realtime")
 _rosters: Dict[str, List[dict]] = defaultdict(list)
 # sid -> room (so disconnect knows which room to remove from)
 _sid_room: Dict[str, str] = {}
+# sid -> client IP, captured at join time, used by kick_socket() to identify
+# which IP to add to the per-room ban list.
+_sid_ip: Dict[str, str] = {}
+# Per-room ban list keyed by client IP. Populated by kick_socket() and
+# consulted on every join. Survives reconnects (until the server process
+# restarts), so a kicked user can't rejoin by refreshing.
+_banned_ips: Dict[str, Set[str]] = defaultdict(set)
 # Module-level handle to the live SocketIO instance, used by kick_socket().
 _socketio = None
+
+
+def _client_ip(req) -> str:
+    """Pull the best-guess client IP from a Flask request. Trusts the first
+    X-Forwarded-For hop (HF Spaces sets this), falling back to REMOTE_ADDR."""
+    fwd = (req.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+    return fwd or req.remote_addr or ""
 
 # A small palette of distinct colors so each user gets a unique cursor color.
 _COLORS = [
@@ -88,6 +102,12 @@ def kick_socket(room: str, target_sid: str) -> bool:
         return False
     room = actual    # use the real socket-room name from here on
     pretty = room[5:].upper() if room.startswith("room_") else room
+    # Ban this client's IP from re-joining the room. The IP was captured
+    # in the join handler; without it we can only disconnect, and the
+    # user would simply rejoin on refresh.
+    ip = _sid_ip.get(target_sid, "")
+    if ip:
+        _banned_ips[room].add(ip)
     try:
         _socketio.emit("kicked", {"room": pretty, "reason": "Removed by host"},
                        to=target_sid, namespace="/collab")
@@ -95,6 +115,7 @@ def kick_socket(room: str, target_sid: str) -> bool:
         pass
     _rosters[room] = [u for u in _rosters[room] if u["sid"] != target_sid]
     _sid_room.pop(target_sid, None)
+    _sid_ip.pop(target_sid, None)
     try:
         _socketio.server.disconnect(target_sid, namespace="/collab")
     except Exception:
@@ -134,6 +155,15 @@ def init_socketio(app, cors_allowed_origins="*") -> SocketIO:
         room = (data or {}).get("room") or "default"
         name = (data or {}).get("name") or "guest"
         sid  = request.sid
+        ip   = _client_ip(request)
+        # Refuse re-join if this IP has been kicked from the room. The
+        # client gets a 'banned' event and stays out of the roster.
+        if ip and ip in _banned_ips.get(room, set()):
+            pretty = room[5:].upper() if room.startswith("room_") else room
+            emit("banned", {"room": pretty,
+                            "reason": "You were removed by the host. Ask the host to invite you back."})
+            log.info(f"refused banned IP={ip} attempting to join {room}")
+            return
         # If this socket was in another room, remove it first.
         prev = _sid_room.get(sid)
         if prev and prev != room:
@@ -158,6 +188,8 @@ def init_socketio(app, cors_allowed_origins="*") -> SocketIO:
 
         join_room(room, namespace="/collab")
         _sid_room[sid] = room
+        if ip:
+            _sid_ip[sid] = ip
         # Don't duplicate if reconnecting
         _rosters[room] = [u for u in _rosters[room] if u["sid"] != sid]
         _rosters[room].append({
@@ -183,6 +215,7 @@ def init_socketio(app, cors_allowed_origins="*") -> SocketIO:
         # Treat as leave.
         sid = request.sid
         room = _sid_room.pop(sid, None)
+        _sid_ip.pop(sid, None)
         if room:
             _rosters[room] = [u for u in _rosters[room] if u["sid"] != sid]
             _broadcast_presence(room)

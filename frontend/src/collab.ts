@@ -75,6 +75,12 @@ class CollabClient {
       this.kickedHandlers.forEach((h) => h(info));
     });
 
+    // The server also emits "banned" when a previously-kicked client tries
+    // to rejoin. Treat it identically — kicks the user back out of the room.
+    s.on("banned", (info: { room: string; reason: string }) => {
+      this.kickedHandlers.forEach((h) => h(info));
+    });
+
     s.on("presence", (data: { users: PresenceUser[] }) => {
       this.presenceHandlers.forEach((h) => h(data.users || []));
     });

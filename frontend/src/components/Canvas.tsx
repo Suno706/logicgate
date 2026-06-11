@@ -80,13 +80,22 @@ export function Canvas({ tool, snapGrid, pendingType, onClearPending, onGateSele
     return null;
   }
 
+  // Pin hit radius is larger on coarse-pointer (touch) devices because
+  // fingers are blunt — the visible pin is still small, but the hit zone
+  // extends generously so taps land. matchMedia is checked once per call,
+  // which is fine: it's a cheap browser API and findPin runs on pointer
+  // events only.
   function findPin(wx: number, wy: number) {
+    const isTouch =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(pointer: coarse)").matches;
+    const radius = isTouch ? 18 : 10;
     for (const gate of circuit.gates) {
       for (const p of getOutputPins(gate)) {
-        if (hitPin(p, wx, wy, 10)) return { gateId: gate.id, pin: p.pin, isOutput: true, x: p.x, y: p.y };
+        if (hitPin(p, wx, wy, radius)) return { gateId: gate.id, pin: p.pin, isOutput: true, x: p.x, y: p.y };
       }
       for (const p of getInputPins(gate)) {
-        if (hitPin(p, wx, wy, 10)) return { gateId: gate.id, pin: p.pin, isOutput: false, x: p.x, y: p.y };
+        if (hitPin(p, wx, wy, radius)) return { gateId: gate.id, pin: p.pin, isOutput: false, x: p.x, y: p.y };
       }
     }
     return null;

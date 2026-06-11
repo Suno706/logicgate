@@ -177,15 +177,15 @@ export function Sidebar({ selected, onSelect }: Props) {
                   key={type}
                   title={desc}
                   onClick={() => onSelect(type)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-all ${
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 md:py-1.5 rounded text-left transition-all min-h-[44px] md:min-h-0 ${
                     isActive ? "bg-bg-600 border border-current" : "hover:bg-bg-700 border border-transparent"
                   }`}
                   style={{ color: isActive ? col : "#6a7a9a" }}
                 >
                   <GateIcon type={type} color={col} />
                   <div className="min-w-0">
-                    <div className="text-[10px] font-mono font-bold leading-tight">{type}</div>
-                    <div className="text-[8px] text-gray-600 leading-tight truncate">{desc}</div>
+                    <div className="text-[12px] md:text-[10px] font-mono font-bold leading-tight">{type}</div>
+                    <div className="text-[10px] md:text-[8px] text-gray-600 leading-tight truncate">{desc}</div>
                   </div>
                 </button>
               );
@@ -261,15 +261,15 @@ export function Sidebar({ selected, onSelect }: Props) {
               title={`Build ${s.name}: ${s.desc}`}
               disabled={!!loading}
               onClick={() => expand(s.name, s.query)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-bg-700 border border-transparent hover:border-accent/30 transition-all disabled:opacity-40 disabled:cursor-wait group">
-              <div className="w-5 h-5 rounded bg-bg-700 border border-bg-600 group-hover:border-accent/40 flex items-center justify-center flex-shrink-0">
+              className="w-full flex items-center gap-2.5 px-2.5 py-2.5 md:py-1.5 rounded text-left hover:bg-bg-700 border border-transparent hover:border-accent/30 transition-all disabled:opacity-40 disabled:cursor-wait group min-h-[44px] md:min-h-0">
+              <div className="w-6 h-6 md:w-5 md:h-5 rounded bg-bg-700 border border-bg-600 group-hover:border-accent/40 flex items-center justify-center flex-shrink-0">
                 {isLoading
-                  ? <Loader2 size={9} className="animate-spin text-accent" />
-                  : <Zap size={9} className="text-gray-600 group-hover:text-accent transition-colors" />}
+                  ? <Loader2 size={11} className="animate-spin text-accent" />
+                  : <Zap size={11} className="text-gray-600 group-hover:text-accent transition-colors" />}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[10px] font-mono font-bold leading-tight text-gray-300 group-hover:text-gray-100">{s.name}</div>
-                <div className="text-[8px] text-gray-600 leading-tight truncate">{s.desc}</div>
+                <div className="text-[12px] md:text-[10px] font-mono font-bold leading-tight text-gray-300 group-hover:text-gray-100">{s.name}</div>
+                <div className="text-[10px] md:text-[8px] text-gray-600 leading-tight truncate">{s.desc}</div>
               </div>
             </button>
           );

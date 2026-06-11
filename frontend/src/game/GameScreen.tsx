@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Gamepad2, ChevronRight, Zap, Cpu, Table2 } from "lucide-react";
+import { X, Gamepad2, ChevronRight, Zap, Cpu, Table2, MousePointer2 } from "lucide-react";
 import { SignalMaze } from "./SignalMaze";
 import { OverrideMode } from "./OverrideMode";
 import { BuildTable } from "./BuildTable";
@@ -65,7 +65,16 @@ function Launcher({ onPick }: { onPick: (g: GameId) => void }) {
           Pick a game. Both run entirely in the browser — no scores leave your device.
         </p>
 
-        <div className="grid md:grid-cols-3 gap-5">
+        <div className="grid md:grid-cols-2 gap-5">
+          <GameCard
+            icon={<MousePointer2 size={22} />}
+            tag="Build on the canvas"
+            title="Canvas Challenge"
+            blurb="A random truth table is your goal. Drag real gates from the palette, wire them between A, B and Y on the actual editor. Hit Check — every input combination is simulated and compared to the target. Match every row to win."
+            cta="Start building →"
+            highlight
+            onClick={() => window.dispatchEvent(new CustomEvent("logicgate:start-challenge", { detail: { nIn: 2 } }))}
+          />
           <GameCard
             icon={<Cpu size={22} />}
             tag="Procedural · Puzzle"
@@ -78,7 +87,7 @@ function Launcher({ onPick }: { onPick: (g: GameId) => void }) {
             icon={<Table2 size={22} />}
             tag="Procedural · Puzzle"
             title="Build the Table"
-            blurb="A random truth table appears. Pick gates so your output column matches the target row by row. New table every round."
+            blurb="A random truth table appears. Pick gates from a palette so your output column matches the target row by row. New table every round."
             cta="Match the table →"
             onClick={() => onPick("build")}
           />
@@ -100,14 +109,19 @@ function Launcher({ onPick }: { onPick: (g: GameId) => void }) {
   );
 }
 
-function GameCard({ icon, tag, title, blurb, cta, onClick }: {
-  icon: React.ReactNode; tag: string; title: string; blurb: string; cta: string; onClick: () => void;
+function GameCard({ icon, tag, title, blurb, cta, onClick, highlight }: {
+  icon: React.ReactNode; tag: string; title: string; blurb: string; cta: string;
+  onClick: () => void; highlight?: boolean;
 }) {
   return (
     <button onClick={onClick}
-      className="text-left rounded-2xl border border-bg-600 bg-bg-800/70 hover:bg-bg-800 hover:border-accent/50 p-6 transition-colors group">
+      className={`text-left rounded-2xl border p-6 transition-colors group ${
+        highlight
+          ? "bg-accent/10 border-accent/60 hover:bg-accent/15"
+          : "bg-bg-800/70 border-bg-600 hover:bg-bg-800 hover:border-accent/50"
+      }`}>
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-11 h-11 rounded-xl bg-accent/10 border border-accent/30 text-accent flex items-center justify-center">
+        <div className="w-11 h-11 rounded-xl bg-accent/15 border border-accent/40 text-accent flex items-center justify-center">
           {icon}
         </div>
         <div>

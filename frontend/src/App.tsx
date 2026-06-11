@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { health, getSessionId } from "./api";
 import type { GateType, Tool, RightTab } from "./types";
-import { useCircuitReducer, StateCtx, DispatchCtx } from "./store";
+import { useCircuitReducer, StateCtx, DispatchCtx, useCircuitActions } from "./store";
 import { collab } from "./collab";
 import { getDisplayName } from "./components/SignInGate";
 import { Canvas, CanvasEmptyState } from "./components/Canvas";
@@ -14,6 +14,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { WelcomeTour }  from "./components/WelcomeTour";
 import { SignInGate }   from "./components/SignInGate";
 import { GameScreen }   from "./game/GameScreen";
+import { CanvasChallenge, randomTarget, seedChallengeCircuit, type ChallengeState } from "./game/CanvasChallenge";
 
 /**
  * Slim vertical bar that sits between the canvas and each side panel.
@@ -59,19 +60,35 @@ export default function App() {
   const [rightOpen,      setRightOpen]      = useState(!isMobileInit);
   const [isMobile,       setIsMobile]       = useState(isMobileInit);
   const [gameOpen,       setGameOpen]       = useState(false);
+  const [challenge,      setChallenge]      = useState<ChallengeState>({ active: false, nIn: 2, target: [] });
 
-  // Custom event so any component can request the full-screen arcade.
+  const actions = useCircuitActions(dispatch);
+
+  function startChallenge(nIn: 2 | 3) {
+    actions.setCircuit(seedChallengeCircuit(nIn));
+    setChallenge({ active: true, nIn, target: randomTarget(nIn) });
+    setGameOpen(false);
+  }
+
+  // Custom events so any component can request the arcade or a canvas challenge.
   useEffect(() => {
     const open = () => setGameOpen(true);
+    const startChal = (e: Event) => {
+      const ce = e as CustomEvent<{ nIn?: 2 | 3 }>;
+      startChallenge(ce.detail?.nIn ?? 2);
+    };
     window.addEventListener("logicgate:open-game", open);
+    window.addEventListener("logicgate:start-challenge", startChal);
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setGameOpen(false);
     }
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("logicgate:open-game", open);
+      window.removeEventListener("logicgate:start-challenge", startChal);
       window.removeEventListener("keydown", onKey);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -189,7 +206,18 @@ export default function App() {
                     onClearPending={() => setPendingType(null)}
                     onGateSelected={handleGateSelected}
                   />
-                  {state.circuit.gates.length === 0 && <CanvasEmptyState />}
+                  {state.circuit.gates.length === 0 && !challenge.active && <CanvasEmptyState />}
+
+                  {challenge.active && (
+                    <CanvasChallenge
+                      challenge={challenge}
+                      onNew={() => {
+                        actions.setCircuit(seedChallengeCircuit(challenge.nIn));
+                        setChallenge((c) => ({ ...c, target: randomTarget(c.nIn) }));
+                      }}
+                      onExit={() => setChallenge({ active: false, nIn: 2, target: [] })}
+                    />
+                  )}
 
                   {/* Mobile-only floating toggles to open the two side panels */}
                   {isMobile && !sidebarOpen && (

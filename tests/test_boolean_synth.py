@@ -154,3 +154,42 @@ def test_constant_one(synth):
     for a in [0, 1]:
         sim = _simulate_with(circuit, {"A": a})
         assert sim[output_ids[0]] == 1
+
+
+# -- Headline: full adder sum bit -------------------------------------------
+# The synth's job is to take any boolean expression and produce a circuit
+# that matches it on every input combination. This test pins the sum bit of
+# a full adder (A XOR B XOR Cin) and verifies all 8 input rows simulate
+# correctly. This is the "Quine–McCluskey works end-to-end" smoke test.
+
+def test_full_adder_sum_bit_matches_truth_table(synth):
+    expr = "A ^ B ^ C"
+    circuit, info = synth.build(expr)
+    assert info["gate_count"] >= 1, "sum bit must use at least one gate"
+
+    output_ids = [g["id"] for g in circuit["gates"] if g["type"] == "OUTPUT"]
+    assert len(output_ids) == 1
+    out_id = output_ids[0]
+
+    for a, b, c in itertools.product([0, 1], repeat=3):
+        sim    = _simulate_with(circuit, {"A": a, "B": b, "C": c})
+        expect = a ^ b ^ c
+        assert sim[out_id] == expect, (
+            f"sum bit mismatch at A={a} B={b} C={c}: "
+            f"expected {expect}, got {sim[out_id]}"
+        )
+
+
+def test_full_adder_carry_bit_matches_truth_table(synth):
+    """Carry-out of a full adder is the majority function of 3 inputs."""
+    expr = "(A & B) | (B & C) | (A & C)"
+    circuit, info = synth.build(expr)
+    assert info["gate_count"] >= 2
+
+    output_ids = [g["id"] for g in circuit["gates"] if g["type"] == "OUTPUT"]
+    out_id = output_ids[0]
+
+    for a, b, c in itertools.product([0, 1], repeat=3):
+        sim    = _simulate_with(circuit, {"A": a, "B": b, "C": c})
+        expect = int((a & b) | (b & c) | (a & c))
+        assert sim[out_id] == expect

@@ -11,6 +11,7 @@ license: mit
 
 # LogicGate — Browser-based Digital Logic Designer
 
+[![CI](https://github.com/Suno706/logicgate/actions/workflows/ci.yml/badge.svg)](https://github.com/Suno706/logicgate/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/flask-3.x-green.svg)](https://flask.palletsprojects.com/)
 [![React 18](https://img.shields.io/badge/react-18-blue.svg)](https://react.dev/)

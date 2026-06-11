@@ -416,20 +416,31 @@ def ml_info():
     users see what actually produced their result."""
     if (r := _ml_guard()): return r
 
+    # Honest one-line descriptions of what each pickled model actually
+    # contributes. The wrapper objects (FaultDetector, etc.) blend the ML
+    # model with rule-based logic — the headline "engine" name reflects
+    # which side does the heavy lifting.
+    role_of = {
+        'fault_detector':    'Rule-based (cycles, floating pins, missing outputs); '
+                             'auxiliary MLP classifier used only by /api/predict.',
+        'circuit_optimizer': 'Structural analysis (gate counts, depth); MLP suggests '
+                             'a difficulty bucket. Heuristic answers, not optimization.',
+        'gate_minimizer':    'Minimisation answers come from Quine–McCluskey, not the '
+                             'pickled RandomForest (which only predicts gate-count buckets).',
+    }
     def _model_meta(name, obj):
         if obj is None or getattr(obj, 'model', None) is None:
-            return {'name': name, 'loaded': False}
+            return {'name': name, 'loaded': False, 'role': role_of.get(name, '')}
         m = obj.model
-        cls = type(m).__name__
-        out = {'name': name, 'loaded': True, 'model_class': cls,
-               'library': 'scikit-learn'}
-        # Common scikit-learn hyperparams worth showing.
+        out = {'name': name, 'loaded': True,
+               'classifier_class': type(m).__name__,
+               'library': 'scikit-learn',
+               'role': role_of.get(name, '')}
         for attr in ('n_estimators', 'max_depth', 'hidden_layer_sizes',
                      'n_iter_', 'n_classes_', 'n_features_in_'):
             v = getattr(m, attr, None)
             if v is not None:
                 out[attr] = list(v) if hasattr(v, '__iter__') and not isinstance(v, (str, bytes)) else int(v) if isinstance(v, (int,)) else v
-        # FaultDetector / Optimizer also have scaler_
         if hasattr(obj, 'scaler') and obj.scaler is not None:
             out['standardized'] = True
         return out

@@ -24,7 +24,10 @@ def test_health(client):
     assert r.status_code == 200
     data = r.get_json()
     assert data["status"] == "online"
-    assert "models" in data
+    # /api/health reports an engines map keyed by feature name. Each engine
+    # value is a bool — True means the backend can serve that feature.
+    assert "engines" in data and isinstance(data["engines"], dict)
+    assert data["engines"].get("boolean_synth") is True
 
 
 # -- /api/ask -----------------------------------------------------------------

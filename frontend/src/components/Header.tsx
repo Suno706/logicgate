@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   MousePointer2, Spline, Hand, Undo2, Redo2, Trash2, Square,
   Grid3x3, Play, StopCircle, Save, FolderOpen, Wifi, WifiOff,
-  Loader2, X, Maximize2, Users, BookOpen, Sun, Moon, LogIn,
+  Loader2, X, Maximize2, Users, BookOpen, Sun, Moon, LogIn, Gamepad2,
 } from "lucide-react";
 import { getTheme, toggleTheme } from "../theme";
 import type { Tool } from "../types";
@@ -331,6 +331,14 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
           title="Join a shared room — everyone in the same room sees the same saved circuits"
           variant={currentRoom ? "primary" : "default"}
           onClick={() => setShowRoom(true)} />
+
+        <Divider />
+
+        {/* Logic Arcade — full-screen mini-games */}
+        <ToolBtn icon={<Gamepad2 size={13} />} label="Play"
+          title="Open the Logic Arcade — Signal Maze, Override the Mainframe, Build the Table"
+          variant="primary"
+          onClick={() => window.dispatchEvent(new CustomEvent("logicgate:open-game"))} />
 
         <div className="flex-1 min-w-4" />
 

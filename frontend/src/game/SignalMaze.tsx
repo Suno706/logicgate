@@ -1,102 +1,111 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, RotateCcw, ChevronRight } from "lucide-react";
+import { CheckCircle2, RotateCcw, ChevronRight, Dice5 } from "lucide-react";
 import { evalChain, BINARY_GATES, GATE_GLYPH, type GateOp } from "./logic";
 
-/** Signal Maze — a hand-designed puzzle game.
+/** Signal Maze — procedural puzzle game.
  *
- *  Each puzzle is a linear chain of gate slots. The source bit feeds into
- *  the first gate; each subsequent gate takes the previous output plus a
- *  fixed "tap" bit pulled from a labelled input row. The player picks the
- *  gate type for each slot (from a small palette of allowed gates) such
- *  that the final output equals the goal bit — and the output LED lights up.
- *
- *  Levels gradually increase chain length and limit the palette. */
+ *  Every level is freshly generated, not pulled from a hand-built list.
+ *  The puzzle gives the player a source bit, a chain of gate slots each
+ *  fed by a "tap" bit (A, B, C…), a goal bit for the output LED, and a
+ *  palette of allowed gates. The player picks one gate per slot until the
+ *  chain evaluates to the goal. Difficulty (chain length, palette size,
+ *  number of distinct taps) scales with the level counter. */
 
 interface Puzzle {
-  title:   string;
-  hint:    string;
-  source:  0 | 1;            // initial value into stage 0
-  taps:    (0 | 1)[];        // length === slots; other input for each stage
-  tapLabels: string[];       // human-readable name for each tap (A, B, …)
-  palette: GateOp[];         // gates the player may pick from
-  goal:    0 | 1;            // value the LED should land on
+  source: 0 | 1;
+  taps: (0 | 1)[];
+  tapLabels: string[];
+  palette: GateOp[];
+  goal: 0 | 1;
 }
 
-const PUZZLES: Puzzle[] = [
-  {
-    title: "Warm-up — flip a bit",
-    hint:  "Source is HIGH. Pick a gate that lets HIGH through (or flips it as needed).",
-    source: 1, taps: [0], tapLabels: ["—"],
-    palette: ["AND", "OR", "XOR"],
-    goal: 1,
-  },
-  {
-    title: "Two-stage chain",
-    hint:  "Get the LED to HIGH. Source = LOW. Tap A = HIGH, Tap B = HIGH.",
-    source: 0, taps: [1, 1], tapLabels: ["A", "B"],
-    palette: ["AND", "OR", "XOR", "NAND"],
-    goal: 1,
-  },
-  {
-    title: "Mixed taps",
-    hint:  "Source = HIGH, taps alternate. Make LED = LOW.",
-    source: 1, taps: [1, 0, 1], tapLabels: ["A", "B", "C"],
-    palette: ["AND", "OR", "XOR", "XNOR", "NAND"],
-    goal: 0,
-  },
-  {
-    title: "Universal challenge",
-    hint:  "Only NAND allowed in slot 1, only NOR in slot 3. Pick the middle gate.",
-    source: 1, taps: [0, 1, 0], tapLabels: ["A", "B", "C"],
-    palette: ["NAND", "NOR", "XOR"],
-    goal: 1,
-  },
-  {
-    title: "Four-deep",
-    hint:  "Long chain. Source = LOW, taps = HIGH, LOW, HIGH, LOW. LED must be HIGH.",
-    source: 0, taps: [1, 0, 1, 0], tapLabels: ["A", "B", "C", "D"],
-    palette: ["AND", "OR", "XOR", "XNOR", "NAND", "NOR"],
-    goal: 1,
-  },
-];
+function pickN<T>(arr: T[], n: number): T[] {
+  const copy = [...arr];
+  const out: T[] = [];
+  while (out.length < n && copy.length) {
+    out.push(copy.splice(Math.floor(Math.random() * copy.length), 1)[0]);
+  }
+  return out;
+}
 
-const STORAGE = "logicgate.maze.solved";
+function randomPuzzle(level: number): Puzzle {
+  // Length: 1 slot at level 0, growing toward 4 by ~level 6.
+  const len = Math.min(4, 1 + Math.floor(level / 2) + (Math.random() < 0.5 ? 0 : 1));
+  const paletteSize = Math.min(BINARY_GATES.length, 3 + Math.floor(level / 3));
+  const palette = pickN(BINARY_GATES, paletteSize);
+  const taps: (0 | 1)[] = Array.from({ length: len }, () => (Math.random() < 0.5 ? 0 : 1));
+  const tapLabels = Array.from({ length: len }, (_, i) => "ABCD"[i]);
+  const source: 0 | 1 = Math.random() < 0.5 ? 0 : 1;
+
+  // Confirm the puzzle is solvable with the given palette by brute force.
+  // If not (rare), regenerate with a wider palette.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const goal: 0 | 1 = Math.random() < 0.5 ? 0 : 1;
+    if (isSolvable({ source, taps, tapLabels, palette, goal })) {
+      return { source, taps, tapLabels, palette, goal };
+    }
+    // Try the other goal before regenerating
+    const otherGoal: 0 | 1 = goal === 1 ? 0 : 1;
+    if (isSolvable({ source, taps, tapLabels, palette, goal: otherGoal })) {
+      return { source, taps, tapLabels, palette, goal: otherGoal };
+    }
+  }
+  // Final fallback: include every binary gate so at least one solution exists.
+  return { source, taps, tapLabels, palette: [...BINARY_GATES], goal: 1 };
+}
+
+/** Brute-force solvability check: ≤ 6^4 = 1296 combinations, instant. */
+function isSolvable(p: Puzzle): boolean {
+  const n = p.taps.length;
+  const total = Math.pow(p.palette.length, n);
+  for (let i = 0; i < total; i++) {
+    const ops: GateOp[] = [];
+    let x = i;
+    for (let k = 0; k < n; k++) {
+      ops.push(p.palette[x % p.palette.length]);
+      x = Math.floor(x / p.palette.length);
+    }
+    if (evalChain(ops, p.source, p.taps) === p.goal) return true;
+  }
+  return false;
+}
+
+const BEST_KEY = "logicgate.maze.best";
 
 export function SignalMaze() {
-  const [lvl, setLvl] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [puzzle, setPuzzle] = useState<Puzzle>(() => randomPuzzle(1));
   const [picks, setPicks] = useState<(GateOp | null)[]>([]);
-  const [solved, setSolved] = useState<number[]>(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE) || "[]"); }
-    catch { return []; }
+  const [best, setBest] = useState<number>(() => {
+    try { return Number(localStorage.getItem(BEST_KEY) || "0") || 0; }
+    catch { return 0; }
   });
-
-  const puzzle = PUZZLES[lvl];
 
   useEffect(() => {
     setPicks(Array(puzzle.taps.length).fill(null));
-  }, [lvl, puzzle.taps.length]);
+  }, [puzzle]);
 
   const filled = picks.every((p): p is GateOp => p !== null);
-  const output: 0 | 1 | null = filled ? evalChain(picks as GateOp[], puzzle.source, puzzle.taps) : null;
+  const output: 0 | 1 | null = filled
+    ? evalChain(picks as GateOp[], puzzle.source, puzzle.taps)
+    : null;
   const won = filled && output === puzzle.goal;
 
   useEffect(() => {
     if (!won) return;
-    setSolved((prev) => {
-      if (prev.includes(lvl)) return prev;
-      const next = [...prev, lvl];
-      try { localStorage.setItem(STORAGE, JSON.stringify(next)); } catch { /* */ }
-      return next;
-    });
-  }, [won, lvl]);
+    if (level > best) {
+      setBest(level);
+      try { localStorage.setItem(BEST_KEY, String(level)); } catch { /* */ }
+    }
+  }, [won, level, best]);
 
-  // Compute per-stage outputs for the visualisation (whatever is filled so far)
+  // Stage-by-stage output for the visualisation
   const stageValues = useMemo(() => {
     const vals: (0 | 1 | null)[] = [];
     let v: 0 | 1 = puzzle.source;
     for (let i = 0; i < puzzle.taps.length; i++) {
       const op = picks[i];
-      if (op == null) { vals.push(null); v = 0; break; }
+      if (op == null) { vals.push(null); break; }
       v = evalChain([op], v, [puzzle.taps[i]]);
       vals.push(v);
     }
@@ -106,9 +115,13 @@ export function SignalMaze() {
   function setPickAt(i: number, op: GateOp) {
     setPicks((cur) => cur.map((v, k) => k === i ? op : v));
   }
-
   function reset() { setPicks(Array(puzzle.taps.length).fill(null)); }
-  function nextLevel() { setLvl((l) => (l + 1) % PUZZLES.length); }
+  function nextLevel() {
+    const nl = level + 1;
+    setLevel(nl);
+    setPuzzle(randomPuzzle(nl));
+  }
+  function reroll() { setPuzzle(randomPuzzle(level)); }
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-5 md:p-8">
@@ -116,30 +129,26 @@ export function SignalMaze() {
       {/* Level header */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <span className="px-2 py-1 rounded bg-bg-700 border border-bg-600 text-[11px] text-gray-400 tabular-nums">
-            Level {lvl + 1} / {PUZZLES.length}
+          <span className="px-2.5 py-1 rounded-md bg-accent/15 border border-accent/40 text-[12px] text-accent font-semibold tabular-nums">
+            Level {level}
           </span>
-          <h2 className="text-[18px] font-semibold text-gray-100">{puzzle.title}</h2>
+          <span className="text-[12px] text-gray-500">
+            Best <span className="text-gray-300 font-semibold tabular-nums">{best}</span>
+          </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          {PUZZLES.map((_, i) => (
-            <button key={i} onClick={() => setLvl(i)}
-              className={`w-7 h-7 rounded-full text-[11px] font-semibold transition-colors ${
-                i === lvl
-                  ? "bg-accent text-white"
-                  : solved.includes(i)
-                    ? "bg-ok/15 text-ok border border-ok/40"
-                    : "bg-bg-700 text-gray-400 border border-bg-600 hover:border-accent/40"
-              }`}>
-              {i + 1}
-            </button>
-          ))}
-        </div>
+        <button onClick={reroll}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-gray-400 bg-bg-700 border border-bg-600 hover:border-accent/50 hover:text-gray-100 transition-colors"
+          title="Generate a different puzzle at this level">
+          <Dice5 size={13} /> Reroll
+        </button>
       </div>
 
-      <p className="text-[13px] text-gray-400 mb-6 max-w-2xl leading-relaxed">{puzzle.hint}</p>
+      <p className="text-[13px] text-gray-400 mb-6 max-w-2xl leading-relaxed">
+        Pick a gate for each slot so the chain produces the goal output. Every
+        level is freshly generated — no two runs are the same.
+      </p>
 
-      {/* Circuit visualisation: source bulb → [gate slots] → output LED */}
+      {/* Circuit visualisation */}
       <div className="rounded-2xl bg-bg-800/70 border border-bg-600 px-4 md:px-8 py-6 mb-6">
         <div className="flex items-center justify-center flex-wrap gap-3 md:gap-4">
           <Bulb value={puzzle.source} label="SRC" />
@@ -150,7 +159,7 @@ export function SignalMaze() {
                 op={picks[i]}
                 tapValue={puzzle.taps[i]}
                 tapLabel={puzzle.tapLabels[i]}
-                output={stageValues[i]}
+                output={stageValues[i] ?? null}
               />
             </div>
           ))}
@@ -158,7 +167,12 @@ export function SignalMaze() {
           <Bulb value={output} label="LED" big highlight={won} />
         </div>
 
-        <div className="mt-6 grid gap-3" style={{ gridTemplateColumns: `repeat(${puzzle.taps.length}, minmax(0, 1fr))` }}>
+        <div className="mt-2 text-center text-[11px] text-gray-500">
+          Goal: LED = <span className={puzzle.goal === 1 ? "text-ok font-semibold" : "text-err font-semibold"}>{puzzle.goal}</span>
+        </div>
+
+        {/* Gate palette per slot */}
+        <div className="mt-5 grid gap-3" style={{ gridTemplateColumns: `repeat(${puzzle.taps.length}, minmax(0, 1fr))` }}>
           {puzzle.taps.map((_, slotIdx) => (
             <div key={slotIdx} className="flex flex-col gap-1">
               <div className="text-[11px] text-gray-500 text-center">
@@ -206,10 +220,6 @@ export function SignalMaze() {
           className="flex items-center gap-1.5 px-4 py-2 rounded-md text-[12px] font-semibold text-white bg-accent hover:bg-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
           Next level <ChevronRight size={14} />
         </button>
-        <div className="flex-1" />
-        <span className="text-[11px] text-gray-500 tabular-nums">
-          Solved {solved.length} / {PUZZLES.length}
-        </span>
       </div>
     </div>
   );
@@ -270,6 +280,3 @@ function Wire({ active }: { active: boolean }) {
     <div className={`h-0.5 w-6 md:w-8 transition-colors ${active ? "bg-ok shadow-[0_0_6px_rgba(74,222,128,0.6)]" : "bg-bg-600"}`} />
   );
 }
-
-// Keep BINARY_GATES import alive for tree-shaker silencing if palette becomes empty
-void BINARY_GATES;

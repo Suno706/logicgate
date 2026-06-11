@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { X, Gamepad2, ChevronRight, Zap, Cpu } from "lucide-react";
+import { X, Gamepad2, ChevronRight, Zap, Cpu, Table2 } from "lucide-react";
 import { SignalMaze } from "./SignalMaze";
 import { OverrideMode } from "./OverrideMode";
+import { BuildTable } from "./BuildTable";
 
-type GameId = "menu" | "maze" | "override";
+type GameId = "menu" | "maze" | "override" | "build";
 
 interface Props {
   onClose: () => void;
@@ -30,7 +31,9 @@ export function GameScreen({ onClose }: Props) {
             </button>
             <ChevronRight size={12} className="text-gray-600" />
             <span className="text-[12px] text-gray-300">
-              {game === "maze" ? "Signal Maze" : "Override the Mainframe"}
+              {game === "maze" ? "Signal Maze"
+                : game === "override" ? "Override the Mainframe"
+                : "Build the Table"}
             </span>
           </>
         )}
@@ -46,6 +49,7 @@ export function GameScreen({ onClose }: Props) {
       {game === "menu" && <Launcher onPick={setGame} />}
       {game === "maze"     && <SignalMaze />}
       {game === "override" && <OverrideMode />}
+      {game === "build"    && <BuildTable />}
     </div>
   );
 }
@@ -61,14 +65,22 @@ function Launcher({ onPick }: { onPick: (g: GameId) => void }) {
           Pick a game. Both run entirely in the browser — no scores leave your device.
         </p>
 
-        <div className="grid md:grid-cols-2 gap-5">
+        <div className="grid md:grid-cols-3 gap-5">
           <GameCard
             icon={<Cpu size={22} />}
-            tag="Puzzle"
+            tag="Procedural · Puzzle"
             title="Signal Maze"
-            blurb="Drop the right gates into a chain so the source signal lights up the LED at the other end. Five hand-built levels."
-            cta="Solve puzzles →"
+            blurb="Route a signal through a chain of gates to light the LED. Every level is freshly generated — never the same puzzle twice."
+            cta="Start solving →"
             onClick={() => onPick("maze")}
+          />
+          <GameCard
+            icon={<Table2 size={22} />}
+            tag="Procedural · Puzzle"
+            title="Build the Table"
+            blurb="A random truth table appears. Pick gates so your output column matches the target row by row. New table every round."
+            cta="Match the table →"
+            onClick={() => onPick("build")}
           />
           <GameCard
             icon={<Zap size={22} />}

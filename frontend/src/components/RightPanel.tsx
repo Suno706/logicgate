@@ -1,4 +1,4 @@
-import { Sigma, Grid2x2, Activity, Lightbulb, Table, Sparkles, Info } from "lucide-react";
+import { Sigma, Grid2x2, Activity, Lightbulb, Table, Sparkles, Info, Gamepad2 } from "lucide-react";
 import type { RightTab } from "../types";
 import { PropsPanel }  from "../panels/PropsPanel";
 import { SmartPanel }  from "../panels/SmartPanel";
@@ -7,6 +7,7 @@ import { KmapPanel }   from "../panels/KmapPanel";
 import { BoolPanel }   from "../panels/BoolPanel";
 import { LedsPanel }   from "../panels/LedsPanel";
 import { SignalPanel } from "../panels/SignalPanel";
+import { GamePanel }   from "../panels/GamePanel";
 
 interface Props {
   tab: RightTab;
@@ -22,6 +23,7 @@ const TABS: { id: RightTab; label: string; icon: React.ReactNode; title: string 
   { id: "sig",   label: "Sig",    icon: <Activity    size={14} />, title: "Signal levels" },
   { id: "leds",  label: "LEDs",   icon: <Lightbulb   size={14} />, title: "Output LED monitor" },
   { id: "smart", label: "Smart",  icon: <Sparkles    size={14} />, title: "Build / Suggest / Fault" },
+  { id: "play",  label: "Play",   icon: <Gamepad2    size={14} />, title: "Guess the Gate — logic mini-game" },
 ];
 
 export function RightPanel({ tab, setTab, selectedGateId }: Props) {
@@ -53,6 +55,7 @@ export function RightPanel({ tab, setTab, selectedGateId }: Props) {
         {tab === "sig"   && <SignalPanel />}
         {tab === "leds"  && <LedsPanel   />}
         {tab === "smart" && <SmartPanel  />}
+        {tab === "play"  && <GamePanel   />}
       </div>
     </aside>
   );

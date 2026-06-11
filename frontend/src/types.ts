@@ -23,7 +23,7 @@ export type GateType = PrimitiveGate | IndicatorGate | MacroGate;
 
 export type Tool = "select" | "wire" | "hand";
 
-export type RightTab = "props" | "smart" | "truth" | "kmap" | "bool" | "sig" | "leds";
+export type RightTab = "props" | "smart" | "truth" | "kmap" | "bool" | "sig" | "leds" | "play";
 
 export interface Gate {
   id: string;

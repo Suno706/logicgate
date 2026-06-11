@@ -62,11 +62,11 @@ export function PresenceBadge() {
             : `In room ${code} — ${total} ${total === 1 ? "person" : "people"}`
         }
       >
-        <Users size={11} className={live ? "text-ok" : "text-accent"} />
-        <span className="text-[9px] font-mono font-bold text-gray-200">
+        <Users size={12} className={live ? "text-ok" : "text-accent"} />
+        <span className="text-[11px] font-mono font-semibold text-gray-100 tracking-tight">
           {code}
         </span>
-        <span className={`text-[9px] font-mono ${live ? "text-ok" : "text-gray-500"}`}>
+        <span className={`text-[11px] font-medium ${live ? "text-ok" : "text-gray-500"}`}>
           · {total}
         </span>
         {/* Avatar stack */}
@@ -89,50 +89,54 @@ export function PresenceBadge() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1 w-64 z-50 bg-bg-800 border border-bg-600 rounded-md shadow-lg p-2 text-xs">
-          <div className="flex items-center justify-between px-1 py-1 border-b border-bg-600 mb-1">
-            <span className="text-gray-400">In room <span className="text-accent">{code}</span></span>
-            {isOwner && <span className="text-accent/70 text-[9px]">host</span>}
+        <div className="absolute right-0 mt-1.5 w-72 z-50 bg-bg-800 border border-bg-600 rounded-lg shadow-xl p-1.5 text-xs">
+          <div className="flex items-center justify-between px-2 py-1.5 border-b border-bg-600 mb-1">
+            <span className="text-[11px] text-gray-400">
+              Room <span className="font-mono font-semibold text-gray-100">{code}</span>
+            </span>
+            {isOwner && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent font-medium">
+                Host
+              </span>
+            )}
           </div>
           {users.length === 0 && (
-            <div className="px-2 py-2 text-gray-500 italic text-[10px]">
+            <div className="px-2 py-2 text-gray-500 italic text-[11px]">
               Connecting…
             </div>
           )}
-          {/* Me first */}
           {me && (
-            <div className="flex items-center gap-2 px-2 py-1.5 bg-bg-700/50 rounded">
-              <div className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-bold"
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-bg-700/40 rounded">
+              <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
                    style={{ backgroundColor: me.color, color: "#0d0d18" }}>
                 {(me.name || "?")[0].toUpperCase()}
               </div>
-              <span className="flex-1 truncate text-gray-200">
-                {me.name || "guest"} <span className="text-gray-500">(you)</span>
+              <span className="flex-1 truncate text-[12px] text-gray-100">
+                {me.name || "guest"} <span className="text-gray-500 text-[11px]">· you</span>
               </span>
             </div>
           )}
-          {/* Peers */}
           {peers.map((u) => (
-            <div key={u.sid} className="flex items-center gap-2 px-2 py-1.5 hover:bg-bg-700 rounded">
-              <div className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-bold"
+            <div key={u.sid} className="group flex items-center gap-2 px-2 py-1.5 hover:bg-bg-700/60 rounded">
+              <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
                    style={{ backgroundColor: u.color, color: "#0d0d18" }}>
                 {(u.name || "?")[0].toUpperCase()}
               </div>
-              <span className="flex-1 truncate text-gray-200">{u.name || "guest"}</span>
+              <span className="flex-1 truncate text-[12px] text-gray-200">{u.name || "guest"}</span>
               {isOwner && (
                 <button
                   onClick={() => handleKick(u.sid, u.name)}
-                  className="px-2 py-0.5 rounded bg-err/15 hover:bg-err/30 text-err text-[9px] font-mono font-semibold border border-err/30"
-                  title="Remove from room"
+                  className="px-2 py-0.5 rounded text-[10px] font-medium text-gray-500 hover:text-err hover:bg-err/10 border border-bg-600 hover:border-err/30 transition-colors flex-shrink-0"
+                  title="Remove this user from the room"
                 >
-                  Kick
+                  Remove
                 </button>
               )}
             </div>
           ))}
           {peers.length === 0 && users.length > 0 && (
-            <div className="px-2 py-1.5 text-gray-500 italic text-[10px]">
-              You're the only one here. Share the invite link in the Room dialog.
+            <div className="px-2 py-1.5 text-gray-500 italic text-[11px]">
+              You're the only one here. Share the invite link to bring others in.
             </div>
           )}
         </div>

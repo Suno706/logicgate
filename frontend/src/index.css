@@ -1,52 +1,55 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ── Theme tokens (default = dark) ──────────────────────────────────────── */
+/* ── Theme tokens (default = dark) ───────────────────────────────────────
+   Dark palette is a soft cool-grey slate (not pure black), with calm
+   indigo accent and muted semantic colors that don't vibrate. Light
+   palette is a warm off-white paper feel with the same accent family. */
 :root {
-  --lg-bg-900: #0a0a0f;
-  --lg-bg-800: #13131a;
-  --lg-bg-700: #1c1c26;
-  --lg-bg-600: #262633;
-  --lg-accent:       #7c5cff;
-  --lg-accent-hover: #9579ff;
-  --lg-ok:   #3ddc97;
-  --lg-warn: #ffb454;
-  --lg-err:  #ff5577;
-  --lg-fg-100: #f5f6fa;
-  --lg-fg-200: #e1e2eb;
-  --lg-fg-300: #c5c7d4;
-  --lg-fg-400: #9aa6bf;
-  --lg-fg-500: #6e7793;
-  --lg-fg-600: #4a5170;
-  --lg-fg-700: #353853;
-  --lg-scroll-track: #0a0a0f;
-  --lg-scroll-thumb: #262633;
-  --lg-scroll-thumb-hover: #363646;
+  --lg-bg-900: #0f1117;   /* app background — soft black-blue */
+  --lg-bg-800: #161922;   /* panels                          */
+  --lg-bg-700: #1d212d;   /* inputs / hover                  */
+  --lg-bg-600: #2a2f3d;   /* borders / dividers              */
+  --lg-accent:       #6366f1;   /* indigo-500 — calm, professional */
+  --lg-accent-hover: #818cf8;   /* indigo-400                      */
+  --lg-ok:   #34d399;     /* emerald-400 */
+  --lg-warn: #f59e0b;     /* amber-500   */
+  --lg-err:  #f87171;     /* red-400     */
+  --lg-fg-100: #f1f3f8;
+  --lg-fg-200: #d8dbe6;
+  --lg-fg-300: #b4b9c9;
+  --lg-fg-400: #8b91a6;
+  --lg-fg-500: #6b7186;
+  --lg-fg-600: #4a4f63;
+  --lg-fg-700: #353948;
+  --lg-scroll-track: #0f1117;
+  --lg-scroll-thumb: #2a2f3d;
+  --lg-scroll-thumb-hover: #3a4055;
 }
 
 html.light {
-  --lg-bg-900: #ffffff;
-  --lg-bg-800: #f4f5f8;
-  --lg-bg-700: #e8eaef;
-  --lg-bg-600: #d4d7de;
-  --lg-accent:       #5840d8;
-  --lg-accent-hover: #7c5cff;
-  --lg-ok:   #1f9d68;
-  --lg-warn: #c97a00;
-  --lg-err:  #c63b56;
-  --lg-fg-100: #0a0a14;
-  --lg-fg-200: #1f2030;
-  --lg-fg-300: #383b54;
-  --lg-fg-400: #555a76;
-  --lg-fg-500: #7a8099;
-  --lg-fg-600: #a3a8bd;
-  --lg-fg-700: #c0c4d2;
-  --lg-scroll-track: #e8eaef;
-  --lg-scroll-thumb: #c0c4d2;
-  --lg-scroll-thumb-hover: #a3a8bd;
+  --lg-bg-900: #fafbfc;   /* warm off-white, not pure         */
+  --lg-bg-800: #f1f3f7;   /* panels                           */
+  --lg-bg-700: #e5e8ee;   /* inputs / hover                   */
+  --lg-bg-600: #cfd3dd;   /* borders                          */
+  --lg-accent:       #4f46e5;   /* indigo-600 — readable on white */
+  --lg-accent-hover: #6366f1;   /* indigo-500                     */
+  --lg-ok:   #059669;     /* emerald-600 */
+  --lg-warn: #b45309;     /* amber-700   */
+  --lg-err:  #dc2626;     /* red-600     */
+  --lg-fg-100: #0f172a;   /* slate-900   */
+  --lg-fg-200: #1e293b;
+  --lg-fg-300: #334155;
+  --lg-fg-400: #475569;
+  --lg-fg-500: #64748b;
+  --lg-fg-600: #94a3b8;
+  --lg-fg-700: #cbd5e1;
+  --lg-scroll-track: #e5e8ee;
+  --lg-scroll-thumb: #cfd3dd;
+  --lg-scroll-thumb-hover: #94a3b8;
 }
 
 @layer base {
@@ -55,9 +58,13 @@ html.light {
   }
   body {
     @apply bg-bg-900 text-gray-200 antialiased;
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
     margin: 0;
     overflow: hidden;
+  }
+  .font-mono, code, pre, kbd {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
   }
   * { box-sizing: border-box; }
   ::-webkit-scrollbar       { width: 6px; height: 6px; }
@@ -91,7 +98,7 @@ html.light {
     @apply border-b border-bg-600 px-3 py-2;
   }
   .label-xs {
-    @apply text-[8px] font-mono uppercase tracking-widest text-gray-600;
+    @apply text-[10px] font-medium tracking-normal text-gray-500;
   }
 }
 

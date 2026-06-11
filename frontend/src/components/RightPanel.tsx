@@ -15,13 +15,13 @@ interface Props {
 }
 
 const TABS: { id: RightTab; label: string; icon: React.ReactNode; title: string }[] = [
-  { id: "props", label: "Props",  icon: <Info        size={11} />, title: "Gate properties" },
-  { id: "truth", label: "Truth",  icon: <Table       size={11} />, title: "Truth table" },
-  { id: "kmap",  label: "K-Map",  icon: <Grid2x2     size={11} />, title: "Karnaugh maps" },
-  { id: "bool",  label: "Bool",   icon: <Sigma       size={11} />, title: "Boolean algebra" },
-  { id: "sig",   label: "Sig",    icon: <Activity    size={11} />, title: "Signal levels" },
-  { id: "leds",  label: "LEDs",   icon: <Lightbulb   size={11} />, title: "Output LED monitor" },
-  { id: "smart", label: "Smart",  icon: <Sparkles    size={11} />, title: "Build / Suggest / Fault" },
+  { id: "props", label: "Props",  icon: <Info        size={14} />, title: "Gate properties" },
+  { id: "truth", label: "Truth",  icon: <Table       size={14} />, title: "Truth table" },
+  { id: "kmap",  label: "K-Map",  icon: <Grid2x2     size={14} />, title: "Karnaugh maps" },
+  { id: "bool",  label: "Bool",   icon: <Sigma       size={14} />, title: "Boolean algebra" },
+  { id: "sig",   label: "Sig",    icon: <Activity    size={14} />, title: "Signal levels" },
+  { id: "leds",  label: "LEDs",   icon: <Lightbulb   size={14} />, title: "Output LED monitor" },
+  { id: "smart", label: "Smart",  icon: <Sparkles    size={14} />, title: "Build / Suggest / Fault" },
 ];
 
 export function RightPanel({ tab, setTab, selectedGateId }: Props) {
@@ -33,10 +33,10 @@ export function RightPanel({ tab, setTab, selectedGateId }: Props) {
             key={id}
             title={title}
             onClick={() => setTab(id)}
-            className={`flex-1 min-w-[42px] flex flex-col items-center gap-0.5 py-2 text-[8px] font-mono uppercase tracking-wider transition-all border-b-2 ${
+            className={`flex-1 min-w-[44px] flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium tracking-normal transition-colors border-b-2 ${
               tab === id
-                ? "border-accent text-accent bg-accent/5"
-                : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-bg-700"
+                ? "border-accent text-gray-100"
+                : "border-transparent text-gray-500 hover:text-gray-200 hover:bg-bg-700/60"
             }`}
           >
             {icon}

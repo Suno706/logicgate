@@ -33,10 +33,10 @@ export function SmartPanel() {
       <div className="flex border-b border-bg-600 flex-shrink-0">
         {(["ask", "build", "suggest", "fault", "min"] as SmartTab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`flex-1 py-1.5 text-[8px] font-mono uppercase tracking-widest transition-all border-b-2 ${
+            className={`flex-1 py-2 text-[11px] font-medium tracking-normal transition-colors border-b-2 ${
               tab === t
-                ? "border-accent text-accent bg-accent/5"
-                : "border-transparent text-gray-600 hover:text-gray-400"
+                ? "border-accent text-gray-100"
+                : "border-transparent text-gray-500 hover:text-gray-200 hover:bg-bg-700/60"
             }`}>
             {t === "ask" ? "Ask" : t === "build" ? "Build" : t === "suggest" ? "Suggest" : t === "fault" ? "Fault" : "Minimize"}
           </button>

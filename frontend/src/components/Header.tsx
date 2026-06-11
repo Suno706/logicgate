@@ -49,9 +49,9 @@ function UserChip() {
           }
         }}
         title={`Signed in as ${name}${room ? ` — in room ${room}` : ""} — click to sign out`}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-md ml-2 text-[10px] font-mono font-semibold border border-accent/40 text-accent hover:bg-accent/10 transition-all flex-shrink-0"
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md ml-2 text-[12px] font-medium border border-accent/40 text-accent hover:bg-accent/10 transition-colors flex-shrink-0"
       >
-        <div className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] bg-accent/20 text-accent">
+        <div className="w-5 h-5 rounded-full flex items-center justify-center font-semibold text-[10px] bg-accent/20 text-accent">
           {name[0].toUpperCase()}
         </div>
         <span className="hidden lg:block max-w-24 truncate">{name}</span>
@@ -64,9 +64,9 @@ function UserChip() {
     return (
       <div
         title={`Working in shared room ${room} (guest)`}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-md ml-2 text-[10px] font-mono font-semibold border border-ok/40 text-ok flex-shrink-0"
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md ml-2 text-[12px] font-mono font-semibold border border-ok/40 text-ok flex-shrink-0"
       >
-        <Users size={11} />
+        <Users size={13} />
         <span className="hidden lg:block">{room}</span>
       </div>
     );
@@ -80,29 +80,29 @@ function UserChip() {
         window.location.reload();
       }}
       title="You're in guest mode — sign in to sync circuits across devices"
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md ml-2 text-[10px] font-mono font-semibold border border-bg-600 text-gray-400 hover:text-accent hover:border-accent/50 transition-all flex-shrink-0"
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md ml-2 text-[12px] font-medium border border-bg-600 text-gray-400 hover:text-accent hover:border-accent/50 transition-colors flex-shrink-0"
     >
-      <LogIn size={11} />
+      <LogIn size={13} />
       <span className="hidden lg:block">Sign in</span>
     </button>
   );
 }
 
 function ToolBtn({ icon, label, title, active, disabled, variant = "default", onClick }: BtnProps) {
-  const base = "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-mono font-semibold border transition-all disabled:opacity-40 disabled:cursor-not-allowed select-none";
+  const base = "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed select-none";
   const styles: Record<string, string> = {
     default: active
-      ? "border-accent/70 text-accent bg-accent/10"
-      : "border-bg-600 text-gray-400 hover:border-gray-500 hover:text-gray-200 hover:bg-bg-700",
-    primary: "border-accent/60 text-accent hover:bg-accent/10",
-    danger:  "border-err/40 text-err hover:bg-err/10",
-    success: "border-ok/40 text-ok hover:bg-ok/10",
-    warning: "border-warn/40 text-warn hover:bg-warn/10",
+      ? "border-accent/60 text-accent bg-accent/8"
+      : "border-bg-600 text-gray-400 hover:border-gray-500 hover:text-gray-100 hover:bg-bg-700",
+    primary: "border-accent/50 text-accent hover:bg-accent/10",
+    danger:  "border-err/30 text-err hover:bg-err/10",
+    success: "border-ok/30 text-ok hover:bg-ok/10",
+    warning: "border-warn/30 text-warn hover:bg-warn/10",
   };
   return (
-    <button title={title} onClick={onClick} disabled={disabled} className={`${base} ${styles[variant]}`}>
+    <button title={title} onClick={onClick} disabled={disabled} className={`${base} ${styles[variant]} flex-shrink-0`}>
       {icon}
-      {label && <span>{label}</span>}
+      {label && <span className="hidden md:inline">{label}</span>}
     </button>
   );
 }
@@ -268,7 +268,7 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
           <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center text-white text-[10px] font-black tracking-tight shadow-md shadow-accent/30">
             LG
           </div>
-          <span className="text-xs font-bold text-gray-100 font-mono whitespace-nowrap">LogicGate</span>
+          <span className="text-[13px] font-semibold text-gray-100 whitespace-nowrap hidden sm:inline">LogicGate</span>
         </div>
 
         <Divider />
@@ -312,12 +312,12 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
         <button
           onClick={runSim}
           disabled={simming || !circuit.gates.length}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-mono font-semibold border border-ok/50 text-ok hover:bg-ok/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium border border-ok/40 text-ok hover:bg-ok/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
           title="Run simulation (Ctrl+Enter)"
         >
           {simming
-            ? <><Loader2 size={13} className="animate-spin" /> Running…</>
-            : <><Play    size={13} /> Simulate</>}
+            ? <><Loader2 size={13} className="animate-spin" /> <span className="hidden md:inline">Running…</span></>
+            : <><Play    size={13} /> <span className="hidden md:inline">Simulate</span></>}
         </button>
         <ToolBtn icon={<StopCircle size={13} />} label="Reset" title="Clear simulation results"
           variant="warning" onClick={actions.clearSimOutputs} />
@@ -335,9 +335,9 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
         <div className="flex-1 min-w-4" />
 
         {/* Stats */}
-        <span className="text-[9px] text-gray-600 font-mono whitespace-nowrap mr-2 hidden sm:block">
-          {circuit.gates.length}g · {circuit.wires.length}w
-          {selected.size > 0 && <span className="text-accent ml-1">· {selected.size} sel</span>}
+        <span className="text-[11px] text-gray-500 whitespace-nowrap mr-2 hidden sm:block tabular-nums">
+          {circuit.gates.length} <span className="text-gray-600">gates</span> · {circuit.wires.length} <span className="text-gray-600">wires</span>
+          {selected.size > 0 && <span className="text-accent ml-1.5">· {selected.size} selected</span>}
         </span>
 
         {/* Live presence — shows other people editing the same room */}
@@ -345,9 +345,9 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
 
         {/* Backend status */}
         <div className="flex items-center gap-1.5 flex-shrink-0" title={backendOk === true ? "Backend online" : backendOk === false ? "Backend offline" : "Connecting…"}>
-          {backendOk === true  && <><Wifi     size={12} className="text-ok"  /><span className="text-[9px] font-mono text-ok  hidden md:block">online</span></>}
-          {backendOk === false && <><WifiOff  size={12} className="text-err" /><span className="text-[9px] font-mono text-err hidden md:block">offline</span></>}
-          {backendOk === null  && <Loader2    size={12} className="text-gray-600 animate-spin" />}
+          {backendOk === true  && <><Wifi     size={13} className="text-ok"  /><span className="text-[11px] font-medium text-ok  hidden md:block">Online</span></>}
+          {backendOk === false && <><WifiOff  size={13} className="text-err" /><span className="text-[11px] font-medium text-err hidden md:block">Offline</span></>}
+          {backendOk === null  && <Loader2    size={13} className="text-gray-600 animate-spin" />}
         </div>
 
         {/* Theme toggle (dark ⇄ light) */}

@@ -11,7 +11,7 @@
  * folder/DB scope.
  */
 import { useEffect, useState } from "react";
-import { LogIn, User, Sparkles, UserPlus } from "lucide-react";
+import { LogIn, User, Sparkles, UserPlus, Eye, EyeOff } from "lucide-react";
 
 const STORAGE_NAME = "logicgate.user_name";
 const STORAGE_SEEN = "logicgate.signin_seen";
@@ -114,9 +114,9 @@ export function SignInGate() {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-accent/15 border border-accent/40">
             <Sparkles size={20} className="text-accent" />
           </div>
-          <h1 className="text-xl font-mono font-bold text-gray-100">LogicGate</h1>
-          <p className="text-[11px] font-mono text-gray-500 leading-relaxed">
-            Digital circuit designer with built-in ML.<br />
+          <h1 className="text-2xl font-semibold text-gray-100 tracking-tight">LogicGate</h1>
+          <p className="text-[12px] text-gray-400 leading-relaxed">
+            Digital circuit designer with built-in synthesis.<br />
             Sign in to save your work across devices, or stay local as a guest.
           </p>
         </div>
@@ -125,39 +125,39 @@ export function SignInGate() {
           <div className="space-y-2.5">
             {googleEnabled && (
               <a href="/api/auth/google"
-                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-white hover:bg-gray-100 text-gray-900 border border-gray-300 transition-all no-underline">
+                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-white hover:bg-gray-100 text-gray-900 border border-gray-300 transition-colors no-underline">
                 <GoogleIcon />
                 <div className="flex-1 text-left">
-                  <div className="text-xs font-mono font-bold">Sign in with Google</div>
-                  <div className="text-[9px] font-mono text-gray-600">One-click · Google account</div>
+                  <div className="text-[13px] font-semibold">Continue with Google</div>
+                  <div className="text-[11px] text-gray-600">One click · synced to your Google account</div>
                 </div>
               </a>
             )}
 
             <button onClick={() => { setMode("login"); setError(""); }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-accent hover:bg-accent-hover text-white border border-accent/60 transition-all">
-              <LogIn size={14} />
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-accent hover:bg-accent-hover text-white border border-accent/60 transition-colors">
+              <LogIn size={16} />
               <div className="flex-1 text-left">
-                <div className="text-xs font-mono font-bold">Sign in</div>
-                <div className="text-[9px] font-mono opacity-80">Username + password · sync across devices</div>
+                <div className="text-[13px] font-semibold">Sign in</div>
+                <div className="text-[11px] opacity-80">Username + password · sync across devices</div>
               </div>
             </button>
 
             <button onClick={() => { setMode("register"); setError(""); }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-700 hover:bg-bg-600 text-gray-200 border border-bg-600 hover:border-accent/40 transition-all">
-              <UserPlus size={14} />
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-700 hover:bg-bg-600 text-gray-200 border border-bg-600 hover:border-accent/40 transition-colors">
+              <UserPlus size={16} />
               <div className="flex-1 text-left">
-                <div className="text-xs font-mono font-bold">Create account</div>
-                <div className="text-[9px] font-mono text-gray-500">Free · 30 seconds · circuits saved online</div>
+                <div className="text-[13px] font-semibold">Create account</div>
+                <div className="text-[11px] text-gray-500">Free · 30 seconds · circuits saved online</div>
               </div>
             </button>
 
             <button onClick={guest}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-700/50 hover:bg-bg-700 text-gray-400 border border-bg-600/50 transition-all">
-              <User size={14} />
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-700/50 hover:bg-bg-700 text-gray-400 border border-bg-600/50 transition-colors">
+              <User size={16} />
               <div className="flex-1 text-left">
-                <div className="text-xs font-mono font-bold">Continue as guest</div>
-                <div className="text-[9px] font-mono text-gray-600">Saved to this browser only</div>
+                <div className="text-[13px] font-semibold">Continue as guest</div>
+                <div className="text-[11px] text-gray-600">Saved to this browser only</div>
               </div>
             </button>
           </div>
@@ -165,46 +165,50 @@ export function SignInGate() {
 
         {(mode === "login" || mode === "register") && (
           <div className="space-y-3">
-            <div className="text-[10px] font-mono text-gray-500 text-center">
+            <div className="text-[12px] text-gray-400 text-center">
               {mode === "register"
-                ? "Pick a username (letters, digits, _ or -) and a password ≥ 6 chars."
+                ? "Pick a username (letters, digits, _ or -) and a password of at least 6 characters."
                 : "Welcome back."}
             </div>
             <div>
-              <label className="text-[8px] font-mono uppercase tracking-widest text-gray-600 block mb-1">Username</label>
+              <label className="text-[11px] font-medium text-gray-400 block mb-1.5">Username</label>
               <input autoFocus
-                className="w-full bg-bg-700 border border-bg-600 rounded-lg px-3 py-2 text-sm font-mono text-gray-100 focus:outline-none focus:border-accent transition-colors"
+                className="w-full bg-bg-700 border border-bg-600 rounded-lg px-3 py-2 text-[13px] text-gray-100 focus:outline-none focus:border-accent transition-colors"
                 value={username} onChange={(e) => setU(e.target.value)}
                 placeholder="ananya" maxLength={32} />
             </div>
             <div>
-              <label className="text-[8px] font-mono uppercase tracking-widest text-gray-600 block mb-1">Password</label>
+              <label className="text-[11px] font-medium text-gray-400 block mb-1.5">Password</label>
               <div className="relative">
                 <input type={showPassword ? "text" : "password"}
-                  className="w-full bg-bg-700 border border-bg-600 rounded-lg pl-3 pr-10 py-2 text-sm font-mono text-gray-100 focus:outline-none focus:border-accent transition-colors"
+                  className="w-full bg-bg-700 border border-bg-600 rounded-lg pl-3 pr-10 py-2 text-[13px] text-gray-100 focus:outline-none focus:border-accent transition-colors"
                   value={password} onChange={(e) => setP(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && submit()}
                   placeholder="at least 6 characters" />
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-accent transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-accent transition-colors"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   title={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? "🙈" : "👁"}
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             </div>
-            {error && <div className="text-[10px] font-mono text-err">{error}</div>}
+            {error && (
+              <div className="text-[12px] text-err bg-err/10 border border-err/30 rounded-md px-3 py-2">
+                {error}
+              </div>
+            )}
             <div className="flex gap-2">
               <button onClick={() => setMode("choose")}
-                className="px-4 py-2 rounded-lg bg-bg-700 hover:bg-bg-600 text-gray-400 text-xs font-mono border border-bg-600">
+                className="px-4 py-2 rounded-lg bg-bg-700 hover:bg-bg-600 text-gray-300 text-[13px] font-medium border border-bg-600 transition-colors">
                 Back
               </button>
               <button onClick={submit} disabled={busy || !username || password.length < 6}
-                className="flex-1 py-2 rounded-lg bg-accent hover:bg-accent-hover text-white text-xs font-mono font-bold disabled:opacity-40 transition-all">
-                {busy ? "…" : (mode === "register" ? "Create account" : "Sign in")}
+                className="flex-1 py-2 rounded-lg bg-accent hover:bg-accent-hover text-white text-[13px] font-semibold disabled:opacity-40 transition-colors">
+                {busy ? "Working…" : (mode === "register" ? "Create account" : "Sign in")}
               </button>
             </div>
           </div>

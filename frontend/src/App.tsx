@@ -18,6 +18,7 @@ import { SignInGate }   from "./components/SignInGate";
 // it's also used by the always-visible challenge bar above the canvas.
 const GameScreen = lazy(() => import("./game/GameScreen").then((m) => ({ default: m.GameScreen })));
 import { CanvasChallenge, randomTarget, seedChallengeCircuit, type ChallengeState } from "./game/CanvasChallenge";
+import { TopologyChip } from "./components/TopologyChip";
 
 /**
  * Slim vertical bar that sits between the canvas and each side panel.
@@ -218,6 +219,10 @@ export default function App() {
                     onGateSelected={handleGateSelected}
                   />
                   {state.circuit.gates.length === 0 && !challenge.active && <CanvasEmptyState />}
+
+                  {/* Live ML topology classifier — only visible when not
+                      in challenge mode (which has its own coaching). */}
+                  {!challenge.active && <TopologyChip />}
 
                   {challenge.active && (
                     <CanvasChallenge

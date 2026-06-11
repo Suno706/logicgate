@@ -46,6 +46,7 @@ from ml_models.boolean_synth        import (
     BooleanSynthesizer, BooleanParseError
 )
 from ml_models.connection_suggester import ConnectionSuggester
+from ml_models.topology_classifier  import TopologyClassifier
 
 # Serve the Vite/React build from frontend/dist.
 _DIST = os.path.join(os.path.dirname(__file__), 'frontend', 'dist')
@@ -83,11 +84,13 @@ gate_minimizer       = None
 boolean_synth        = None
 connection_suggester = None
 question_solver      = None
+topology_classifier  = None
 _ml_ready            = False
 
 def _load_ml_models():
     global fault_detector, circuit_optimizer, gate_minimizer
-    global boolean_synth, connection_suggester, question_solver, _ml_ready
+    global boolean_synth, connection_suggester, question_solver
+    global topology_classifier, _ml_ready
     print("Loading ML models in background...")
     fault_detector       = FaultDetector()
     circuit_optimizer    = CircuitOptimizer()
@@ -99,6 +102,11 @@ def _load_ml_models():
         gate_minimizer=gate_minimizer,
         boolean_synth=boolean_synth,
     )
+    topology_classifier  = TopologyClassifier()
+    if not topology_classifier.load():
+        print("  topology_classifier.pkl not found — "
+              "/api/topology endpoints will report not_ready=True. "
+              "Run `python train_topology.py` to train.")
     _ml_ready = True
     print("All ML models ready.")
 
@@ -487,6 +495,57 @@ def ml_info():
             'description': ('Pure algorithmic minimisation — not ML. Produces '
                             'provably-minimal SOP for ≤12 vars.'),
         },
+        'topology_classifier': {
+            'name': 'topology_classifier',
+            'model_class': 'RandomForestClassifier',
+            'library': 'scikit-learn',
+            'loaded': bool(topology_classifier and topology_classifier.is_ready()),
+            'description': ('34 structural features -> circuit topology label '
+                            '(half_adder / full_adder / mux / decoder / latch / '
+                            'flip_flop / register / generic). Recognises '
+                            'topologically equivalent circuits across different '
+                            'wirings — the place ML earns its keep in this app.'),
+        },
+    })
+
+
+# -- Topology classifier (real-time circuit-type prediction) -------------------
+
+@app.route('/api/topology/classify', methods=['POST'])
+def topology_classify():
+    """Predict the circuit topology label for the user's current canvas.
+
+    Body: {"circuit": {"gates": [...], "wires": [...]}, "top_k": 3}
+    Returns: {"top": [[label, prob], ...], "ready": bool, "note": str?}
+    """
+    if (r := _ml_guard()): return r
+    if topology_classifier is None or not topology_classifier.is_ready():
+        return jsonify({
+            'top': [], 'ready': False,
+            'note': 'Topology classifier not loaded — '
+                    'run `python train_topology.py`.',
+        }), 200
+    try:
+        body    = request.get_json(silent=True) or {}
+        circuit = body.get('circuit') or {}
+        top_k   = int(body.get('top_k') or 3)
+        return jsonify(topology_classifier.classify(circuit, top_k=top_k))
+    except Exception as e:
+        return _err(e, exc=e)
+
+
+@app.route('/api/topology/info', methods=['GET'])
+def topology_info():
+    """Honest model card surfaced as JSON: training metrics, label set,
+    feature names + importances. The /models page renders this."""
+    if (r := _ml_guard()): return r
+    if topology_classifier is None or not topology_classifier.is_ready():
+        return jsonify({'loaded': False}), 200
+    return jsonify({
+        'loaded':              True,
+        'metrics':             topology_classifier.metrics,
+        'feature_names':       topology_classifier.feature_names,
+        'feature_importances': topology_classifier.feature_importance(),
     })
 
 

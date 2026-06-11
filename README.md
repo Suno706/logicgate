@@ -25,6 +25,14 @@ license: mit
 
 ### What it actually does
 
+- **Live circuit topology classifier (ML)** — a `RandomForestClassifier`
+  trained on 34 structural features watches your canvas in real time and
+  predicts which canonical circuit you're building (half adder, full
+  adder, 4:1 mux, decoder, latch, D-/JK-flip-flop, N-bit register, or
+  generic). Trained with stratified 60/20/20 split + 5-fold CV; metrics,
+  feature importances and confusion matrix are persisted in
+  [`ml_models/saved/topology_metrics.json`](ml_models/saved/topology_metrics.json).
+  Full [model card](docs/model_cards/topology_classifier.md) included.
 - **Quine-McCluskey synthesiser** — give it a truth table or a boolean
   expression and it returns a minimal-SOP circuit, optionally restricted
   to a target gate set (e.g. NAND-only, NOR-only) or composed from

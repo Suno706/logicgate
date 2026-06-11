@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { health, getSessionId } from "./api";
 import type { GateType, Tool, RightTab } from "./types";
@@ -13,7 +13,10 @@ import { ToastProvider } from "./components/Toast";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { WelcomeTour }  from "./components/WelcomeTour";
 import { SignInGate }   from "./components/SignInGate";
-import { GameScreen }   from "./game/GameScreen";
+// Game code is code-split — the ~80 KB arcade bundle is only fetched when
+// the user actually opens it. CanvasChallenge stays eagerly imported because
+// it's also used by the always-visible challenge bar above the canvas.
+const GameScreen = lazy(() => import("./game/GameScreen").then((m) => ({ default: m.GameScreen })));
 import { CanvasChallenge, randomTarget, seedChallengeCircuit, type ChallengeState } from "./game/CanvasChallenge";
 
 /**
@@ -157,7 +160,15 @@ export default function App() {
           <DispatchCtx.Provider value={dispatch}>
             <SignInGate />
             <WelcomeTour />
-            {gameOpen && <GameScreen onClose={() => setGameOpen(false)} />}
+            {gameOpen && (
+              <Suspense fallback={
+                <div className="fixed inset-0 z-[120] bg-bg-900 flex items-center justify-center text-gray-400 text-sm">
+                  Loading arcade…
+                </div>
+              }>
+                <GameScreen onClose={() => setGameOpen(false)} />
+              </Suspense>
+            )}
             <div className="h-screen flex flex-col overflow-hidden bg-bg-900 text-gray-200">
 
               <Header

@@ -6,7 +6,7 @@ const STORAGE_KEY = "logicgate.tour_seen_v1";
 const STEPS = [
   {
     title: "Welcome to LogicGate",
-    body: "Build digital circuits with drag-and-drop, simulate them, and ask the AI Smart panel anything about digital logic. This 30-second tour shows you around.",
+    body: "Build digital circuits with drag-and-drop, simulate them, and ask the Smart panel to synthesise circuits from natural language or truth tables. This 30-second tour shows you around.",
     icon: "👋",
   },
   {
@@ -30,8 +30,8 @@ const STEPS = [
     icon: "👥",
   },
   {
-    title: "Smart panel learns from YOU",
-    body: "Every answer the Smart panel gives has 👍/👎 buttons. Click them to teach the ML model. Hit \"Retrain on my feedback\" to apply your corrections. The more you use it, the better it gets.",
+    title: "Tell the Smart panel what worked",
+    body: "Every answer the Smart panel gives has 👍/👎 buttons. Your feedback is saved and used by \"Retrain intent router\" to refine which builder gets picked next time.",
     icon: "🧠",
   },
 ];

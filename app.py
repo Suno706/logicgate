@@ -391,26 +391,29 @@ def room_kick(code):
 
 @app.route('/api/health', methods=['GET'])
 def health():
+    # Honest health: report what the backend can actually do, not which
+    # pickle files happen to be loaded. The user doesn't care whether a
+    # particular model is "ML"; they care whether the feature works.
     return jsonify({
-        'status':    'online', 'version': '3.1',
-        'ml_ready':  _ml_ready,
-        'features':  ['fault_detection', 'optimization', 'gate_minimization',
-                      'question_solver', 'boolean_synth', 'connection_suggester'],
-        'models': {
-            'fault_detector':       bool(fault_detector and fault_detector.model is not None),
-            'circuit_optimizer':    bool(circuit_optimizer and circuit_optimizer.model is not None),
-            'gate_minimizer':       bool(gate_minimizer and gate_minimizer.model is not None),
-            'connection_suggester': bool(connection_suggester and connection_suggester.is_ready()),
-        }
+        'status':   'online', 'version': '3.1',
+        'engines': {
+            'boolean_synth':     bool(boolean_synth),       # Quine-McCluskey synthesiser
+            'fault_analysis':    bool(fault_detector),      # rule-based fault checks
+            'gate_minimisation': bool(gate_minimizer),      # SOP minimisation
+            'circuit_analysis':  bool(circuit_optimizer),
+            'intent_router':     _ml_ready,                 # NL → handler routing
+            'question_solver':   bool(question_solver),
+        },
     })
 
 
 @app.route('/api/ml/info', methods=['GET'])
 def ml_info():
-    """Introspect the actual scikit-learn models so the UI can SHOW the user
-    that real ML is doing the work (model class, hyperparameters, dataset
-    size). Removes the "feels predefined" concern by exposing concrete
-    evidence."""
+    """Engine introspection. Each backend feature is described honestly —
+    Quine-McCluskey minimisation is algorithmic, the intent router is
+    TF-IDF + LogisticRegression, fault analysis is rule-based with an
+    auxiliary classifier kept for prototyping. The UI surfaces these so
+    users see what actually produced their result."""
     if (r := _ml_guard()): return r
 
     def _model_meta(name, obj):

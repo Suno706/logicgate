@@ -65,45 +65,23 @@ interface ChatMsg {
   feedback?: "up" | "down" | null;
 }
 
-/**
- * Renders the actual scikit-learn model details returned from the backend.
- * Proves to the user that real ML (not predefined templates) ran their
- * request — addresses 'it feels like predefined data' feedback.
- */
-function MLModelCard({ model }: { model: any }) {
-  if (!model) return null;
-  const detail = (k: string) => (model[k] !== undefined && model[k] !== null) ? String(model[k]) : null;
-  const hidden = model.hidden_layer_sizes;
+/** Tiny "engine" caption replacing the over-claimed "ML Model Ran This"
+ *  card. Honest about what produced the result — Quine-McCluskey for
+ *  synthesis, rule-based for fault analysis, keyword router for intent. */
+function EngineCaption({ model }: { model: any }) {
+  if (!model || !model.name) return null;
+  const friendly: Record<string, string> = {
+    fault_detector:    "Rule-based fault analysis",
+    circuit_optimizer: "Structural circuit analysis",
+    gate_minimizer:    "Quine–McCluskey minimization",
+    boolean_synth:     "Quine–McCluskey boolean synthesis",
+    intent_classifier: "Intent router",
+    nl_tt_model:       "Natural-language truth-table parser",
+  };
+  const label = friendly[model.name] || model.name;
   return (
-    <div className="bg-bg-700/60 border border-accent/30 rounded p-2 text-[9px] font-mono mt-2">
-      <div className="text-[8px] uppercase tracking-widest text-accent mb-1">
-        ML model ran this
-      </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-        <div className="text-gray-500">name</div>
-        <div className="text-gray-200">{model.name}</div>
-        <div className="text-gray-500">class</div>
-        <div className="text-gray-200">{model.class || model.model_class || "?"}</div>
-        <div className="text-gray-500">library</div>
-        <div className="text-gray-200">{model.library || "scikit-learn"}</div>
-        {detail("n_estimators") && (<>
-          <div className="text-gray-500">n_estimators</div>
-          <div className="text-gray-200">{model.n_estimators}</div>
-        </>)}
-        {hidden && (<>
-          <div className="text-gray-500">hidden_layers</div>
-          <div className="text-gray-200">{Array.isArray(hidden) ? hidden.join(" → ") : String(hidden)}</div>
-        </>)}
-        {detail("n_features_in_") && (<>
-          <div className="text-gray-500">features</div>
-          <div className="text-gray-200">{model.n_features_in_}</div>
-        </>)}
-        {detail("n_keys") && (<>
-          <div className="text-gray-500">prob_keys</div>
-          <div className="text-gray-200">{model.n_keys}</div>
-        </>)}
-      </div>
-      {model.note && <div className="text-gray-600 mt-1 text-[8px]">{model.note}</div>}
+    <div className="mt-2 text-[10px] text-gray-500">
+      Engine: <span className="text-accent font-medium">{label}</span>
     </div>
   );
 }
@@ -194,7 +172,7 @@ function AskTab({ circuit, dispatch }: { circuit: any; dispatch: any }) {
                   : m.source === "regex" ? "bg-warn/20 text-warn"
                   : "bg-gray-700 text-gray-500"
                 }`}>
-                  {m.source === "ml" ? "ML"
+                  {m.source === "ml" ? "router"
                    : m.source === "knowledge_base" ? "KB"
                    : m.source === "regex" ? "rule" : "fallback"}
                 </span>
@@ -1175,7 +1153,7 @@ function BuildTab({ circuit, dispatch }: { circuit?: any; dispatch: any }) {
           {info.input_vars?.length > 0 && <div>Inputs: <span className="text-gray-300">{info.input_vars.join(", ")}</span></div>}
           {info.target_gates && <div>Gates used: <span className="text-gray-300">{info.target_gates.join(", ")}</span></div>}
           {info.simplified && <div className="mt-1 text-gray-600 break-all">= {info.simplified}</div>}
-          {/* Backend / ML provenance — confirms it actually hit the server */}
+          {/* Backend engine — confirms it actually hit the server */}
           {(info.ml_source || info.confidence != null) && (
             <div className="pt-1 mt-1 border-t border-bg-600 flex flex-wrap gap-x-2 text-gray-600">
               {info.ml_source && (
@@ -1293,7 +1271,7 @@ function SuggestTab({ circuit, dispatch }: { circuit: any; dispatch: any }) {
         </div>
       )}
 
-      {mlModel && <MLModelCard model={mlModel} />}
+      {mlModel && <EngineCaption model={mlModel} />}
 
       {!suggs.length && !error && !loading && (
         <div className="text-[9px] text-gray-600 font-mono text-center py-4">
@@ -1358,9 +1336,9 @@ function FaultTab({ circuit }: { circuit: any }) {
         </div>
       )}
 
-      {/* ML provenance card — shows actual scikit-learn model details so the
+      {/* Engine caption — what produced this result
           user can SEE that real ML (not predefined data) did this work. */}
-      {mlModel && mlModel.loaded && <MLModelCard model={mlModel} />}
+      {mlModel && mlModel.loaded && <EngineCaption model={mlModel} />}
 
       {(["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const).map((sev) => {
         const items = bySev[sev];
@@ -1468,8 +1446,8 @@ function MinTab({ circuit }: { circuit: any }) {
             </div>
           )}
 
-          {/* ML provenance — proves the scikit-learn model did the analysis */}
-          {result.ml_model?.loaded && <MLModelCard model={result.ml_model} />}
+          {/* Engine caption */}
+          {result.ml_model?.loaded && <EngineCaption model={result.ml_model} />}
         </div>
       )}
 

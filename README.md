@@ -9,28 +9,41 @@ pinned: false
 license: mit
 ---
 
-# LogicGate — Natural-Language Digital Circuit Designer
+# LogicGate — Browser-based Digital Logic Designer
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/flask-3.x-green.svg)](https://flask.palletsprojects.com/)
-[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.x-orange.svg)](https://scikit-learn.org/)
+[![React 18](https://img.shields.io/badge/react-18-blue.svg)](https://react.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Suno706/logicgate)
+> A web circuit editor with **Quine-McCluskey boolean synthesis**, real-time
+> multiplayer rooms, a natural-language builder, fault analysis, and a small
+> logic-puzzle arcade. The headline engineering work is the synthesiser —
+> it produces provably-minimal SOP circuits from truth tables or boolean
+> expressions for up to 12 variables.
 
-> Browser-based digital logic designer with built-in scikit-learn ML, real-time
-> multiplayer collaboration, user accounts, and natural-language circuit synthesis.
+### What it actually does
 
-### Features
-
-- **Real accounts** — username + password (SQLite), or "Sign in with Google" (optional OAuth)
-- **Real-time multiplayer** — WebSocket-based, share a 6-character room code, anyone joining sees your canvas live
-- **Cloud-saved circuits** — log in from any device, all your work follows you
-- **Natural-language synthesis** — "build a 4-bit adder" / "Y=1 when at least 2 of 4 inputs are 1"
-- **5 trained scikit-learn models** — fault detection, gate minimization, intent classification, NL→truth-table, connection suggestion
-- **Online learning** — thumbs-up/down on Smart panel answers retrains the intent classifier with user feedback at ×5 weight
-- **K-Map (2–6 vars), Boolean SOP/POS with Quine-McCluskey, truth table, signal monitor, LED gallery**
-- **14 example circuits** in the gallery (half adder → BCD-to-7-segment)
+- **Quine-McCluskey synthesiser** — give it a truth table or a boolean
+  expression and it returns a minimal-SOP circuit, optionally restricted
+  to a target gate set (e.g. NAND-only, NOR-only) or composed from
+  macro blocks (HA, FA, D-FF, MUX2)
+- **Drag-and-drop editor with live simulation** — gates, wires, snap grid,
+  truth table, K-Map (2–6 vars), boolean expression view, signal monitor,
+  LED gallery
+- **Real-time collaboration** — WebSocket rooms, presence, host can kick
+  with IP-based ban list per room
+- **Natural-language builder** — short phrases like "4 bit ripple carry adder"
+  or "Y=1 when at least 2 of 4 inputs are 1" are parsed into circuits.
+  An intent router (TF-IDF + LogisticRegression) picks the handler; the
+  actual circuit comes from Quine-McCluskey or a curated knowledge base
+- **Rule-based fault analysis** — floating inputs, dangling outputs,
+  feedback loops, missing OUTPUT gates
+- **Logic Arcade** — four procedural games that share the simulator:
+  Signal Maze, Build the Table, Override the Mainframe, and a Canvas
+  Challenge that uses the real editor as the playfield
+- **Accounts** — optional SQLite-backed username/password (Google OAuth
+  too if you wire credentials), or guest mode with browser-local storage
 
 ```
 "build a full adder using only NAND"     →   14-gate NAND-only adder

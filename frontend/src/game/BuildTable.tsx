@@ -27,7 +27,7 @@ function randomTarget(nIn: 2 | 3): (0 | 1)[] {
   const rows = 1 << nIn;
   while (true) {
     const bits: (0 | 1)[] = Array.from({ length: rows }, () => (Math.random() < 0.5 ? 0 : 1));
-    const sum = bits.reduce((a, b) => a + b, 0);
+    const sum = bits.reduce<number>((a, b) => a + b, 0);
     if (sum !== 0 && sum !== rows) return bits;
   }
 }

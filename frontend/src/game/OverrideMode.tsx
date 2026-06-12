@@ -123,7 +123,7 @@ export function OverrideMode() {
   const timePct = Math.max(0, Math.min(1, timeLeft / 30_000));
 
   return (
-    <div className={`flex-1 flex flex-col min-h-0 overflow-y-auto p-5 md:p-8 transition-all ${
+    <div className={`p-5 md:p-8 transition-all ${
       flash === "good" ? "bg-ok/5" : flash === "bad" ? "bg-err/5" : ""
     }`}>
 

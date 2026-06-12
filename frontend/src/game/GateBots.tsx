@@ -315,7 +315,7 @@ export function GateBots() {
   const [progress, setProgress] = useState<number>(loadProgress);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-4 md:p-6">
+    <div className="p-4 md:p-6">
       {screen.kind === "menu" && (
         <Menu progress={progress}
           onCampaign={() => setScreen({ kind: "stages" })}

@@ -348,7 +348,8 @@ export function SignalRunner() {
 
   // ── HUD ────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-3 md:p-5 gap-3">
+    <div className="flex flex-col p-3 md:p-5 gap-3"
+         style={{ minHeight: "calc(100vh - 3rem)" }}>
 
       <div className="flex items-center gap-2 flex-wrap">
         <Stat icon={<Heart size={14} />}  label="HP"    value={"♥".repeat(hp) || "·"} colour="text-err" />

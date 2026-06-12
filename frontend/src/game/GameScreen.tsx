@@ -49,13 +49,19 @@ export function GameScreen({ onClose }: Props) {
         </button>
       </div>
 
-      {/* Body */}
-      {game === "menu" && <Launcher onPick={setGame} />}
-      {game === "maze"     && <SignalMaze />}
-      {game === "override" && <OverrideMode />}
-      {game === "build"    && <BuildTable />}
-      {game === "runner"   && <SignalRunner />}
-      {game === "bots"     && <GateBots />}
+      {/* Body — single scrollable container so each game doesn't have to
+          manage scroll itself. iOS Safari needs explicit momentum scrolling
+          via -webkit-overflow-scrolling for finger-flick to feel right; the
+          inline style covers Tailwind not having that as a utility. */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+           style={{ WebkitOverflowScrolling: "touch" }}>
+        {game === "menu" && <Launcher onPick={setGame} />}
+        {game === "maze"     && <SignalMaze />}
+        {game === "override" && <OverrideMode />}
+        {game === "build"    && <BuildTable />}
+        {game === "runner"   && <SignalRunner />}
+        {game === "bots"     && <GateBots />}
+      </div>
     </div>
   );
 }

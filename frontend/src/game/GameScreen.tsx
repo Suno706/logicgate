@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { X, Gamepad2, ChevronRight, Zap, Cpu, Table2, MousePointer2, Activity } from "lucide-react";
+import { X, Gamepad2, ChevronRight, Zap, Cpu, Table2, MousePointer2, Activity, Bot } from "lucide-react";
 import { SignalMaze } from "./SignalMaze";
 import { OverrideMode } from "./OverrideMode";
 import { BuildTable } from "./BuildTable";
 import { SignalRunner } from "./SignalRunner";
+import { GateBots } from "./GateBots";
 
-type GameId = "menu" | "maze" | "override" | "build" | "runner";
+type GameId = "menu" | "maze" | "override" | "build" | "runner" | "bots";
 
 interface Props {
   onClose: () => void;
@@ -35,6 +36,7 @@ export function GameScreen({ onClose }: Props) {
               {game === "maze" ? "Signal Maze"
                 : game === "override" ? "Override the Mainframe"
                 : game === "runner"   ? "Signal Runner"
+                : game === "bots"     ? "Gate Bots"
                 : "Build the Table"}
             </span>
           </>
@@ -53,6 +55,7 @@ export function GameScreen({ onClose }: Props) {
       {game === "override" && <OverrideMode />}
       {game === "build"    && <BuildTable />}
       {game === "runner"   && <SignalRunner />}
+      {game === "bots"     && <GateBots />}
     </div>
   );
 }
@@ -70,12 +73,20 @@ function Launcher({ onPick }: { onPick: (g: GameId) => void }) {
 
         <div className="grid md:grid-cols-2 gap-5">
           <GameCard
+            icon={<Bot size={22} />}
+            tag="Strategy · Campaign + 1v1"
+            title="Gate Bots"
+            blurb="Build a fighting robot out of logic gates — every gate type is a different stat (OR = attack, AND = armor, NOT = speed, XOR = crit…). 10 campaign stages with limited inventories and predefined bosses, plus hot-seat 1v1 on one device."
+            cta="Build your bot →"
+            highlight
+            onClick={() => onPick("bots")}
+          />
+          <GameCard
             icon={<Activity size={22} />}
             tag="Arcade · 2D Runner"
             title="Signal Runner"
             blurb="Race a HIGH/LOW signal through a stream of logic gates. Switch lanes to match each gate's required input — match it, score; mismatch it, lose HP. VCC heals, CLOCK slows time, NOT flips your lane. Touch + keyboard."
             cta="Start the run →"
-            highlight
             onClick={() => onPick("runner")}
           />
           <GameCard

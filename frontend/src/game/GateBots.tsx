@@ -116,6 +116,12 @@ interface LogEntry {
   text: string;
   kind: "hit" | "crit" | "dodge" | "counter" | "shield" | "info" | "win";
   hpA: number; hpB: number; shA: number; shB: number;
+  // Who is the active actor for this entry. For "hit"/"crit", it's the
+  // attacker. For "dodge"/"counter", it's the defender (who just dodged
+  // or just countered). For "shield", it's the defender whose shield
+  // absorbed the hit. Null for narrative entries. The animator uses this
+  // to pick which fighter lunges, recoils, etc.
+  actor: 0 | 1 | null;
 }
 
 // Tiny seeded RNG so a battle replays identically while animating.
@@ -134,8 +140,8 @@ function runBattle(A: Fighter, B: Fighter, seed: number): { log: LogEntry[]; win
   let hpA = A.stats.hp, hpB = B.stats.hp;
   let shA = A.stats.shield, shB = B.stats.shield;
   const log: LogEntry[] = [];
-  const push = (text: string, kind: LogEntry["kind"]) =>
-    log.push({ text, kind, hpA: Math.max(0, hpA), hpB: Math.max(0, hpB), shA, shB });
+  const push = (text: string, kind: LogEntry["kind"], actor: 0 | 1 | null = null) =>
+    log.push({ text, kind, hpA: Math.max(0, hpA), hpB: Math.max(0, hpB), shA, shB, actor });
 
   push(`${A.name} vs ${B.name} — fight!`, "info");
 
@@ -145,9 +151,11 @@ function runBattle(A: Fighter, B: Fighter, seed: number): { log: LogEntry[]; win
 
   const doAttack = (att: Fighter, defF: Fighter, attIsA: boolean): boolean => {
     const a = att.stats, d = defF.stats;
+    const attackerSide: 0 | 1 = attIsA ? 0 : 1;
+    const defenderSide: 0 | 1 = attIsA ? 1 : 0;
     const dodge = Math.max(0, d.dodge - a.aim);
     if (rng() < dodge) {
-      push(`${defF.name} dodges ${att.name}'s attack!`, "dodge");
+      push(`${defF.name} dodges ${att.name}'s attack!`, "dodge", defenderSide);
       return false;
     }
     const isCrit = rng() < a.crit;
@@ -165,20 +173,21 @@ function runBattle(A: Fighter, B: Fighter, seed: number): { log: LogEntry[]; win
       hpA -= (dmg - absorbed);
     }
     if (absorbed > 0) {
-      push(`${defF.name}'s shield absorbs ${absorbed}!`, "shield");
+      push(`${defF.name}'s shield absorbs ${absorbed}!`, "shield", defenderSide);
     }
     push(
       isCrit
         ? `CRIT! ${att.name} smashes ${defF.name} for ${dmg}!`
         : `${att.name} hits ${defF.name} for ${dmg}.`,
       isCrit ? "crit" : "hit",
+      attackerSide,
     );
     // Counter chance
     const defAlive = attIsA ? hpB > 0 : hpA > 0;
     if (defAlive && rng() < d.counter) {
       let cdmg = Math.max(1, Math.round(d.atk * 0.6 - a.armor));
       if (attIsA) hpA -= cdmg; else hpB -= cdmg;
-      push(`${defF.name} counters for ${cdmg}!`, "counter");
+      push(`${defF.name} counters for ${cdmg}!`, "counter", defenderSide);
     }
     return attIsA ? hpB <= 0 : hpA <= 0;
   };
@@ -623,41 +632,325 @@ function Builder({ title, subtitle, inventory, enemyPreview, hideEnemy, onFight,
 
 /* ── battle ─────────────────────────────────────────────────────────── */
 
+/* ── animated battle ─────────────────────────────────────────────────
+   Each LogEntry triggers an animation that lasts ENTRY_MS. The rAF loop
+   tracks the elapsed time inside the current entry and interpolates
+   each fighter's pose (translateX, rotation, flash tint, opacity) so
+   the bots actually lunge, take hits, dodge, recoil. HP bars tween
+   smoothly toward their target value rather than snapping. Particles
+   spawn on hit/crit and decay with their own life timer. */
+
+interface Pose {
+  tx:    number;   // px offset from base position
+  tilt:  number;   // deg
+  flash: number;   // 0..1, red overlay
+  dim:   number;   // 0..1 opacity multiplier (for defeat)
+  scale: number;
+}
+
+interface Particle {
+  id:    number;
+  x:     number;   // px relative to arena
+  y:     number;
+  vx:    number;
+  vy:    number;
+  life:  number;   // seconds remaining
+  ttl:   number;   // initial life
+  color: string;
+  size:  number;
+}
+
+const REST_POSE: Pose = { tx: 0, tilt: 0, flash: 0, dim: 1, scale: 1 };
+const ENTRY_MS = 700;
+
+// Easing
+const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
+const easeInQuad  = (t: number) => t * t;
+
+let _pid = 1;
+const newPid = () => _pid++;
+
 function Battle({ A, B, onDone, onExit, onRematch }: {
   A: Fighter; B: Fighter;
   onDone: (winner: 0 | 1) => void;
   onExit: () => void;
   onRematch: () => void;
 }) {
-  // Battle is fully computed up-front with a random seed, then the log is
-  // revealed entry-by-entry on a timer. Replays smoothly, no rAF needed.
+  // Computed once with a random seed; the log is the script we animate.
   const [result] = useState(() => runBattle(A, B, Math.floor(Math.random() * 1e9)));
-  const [step, setStep] = useState(0);
+
+  // Displayed HP (smoothly tweened) — separate from logical HP at each entry.
+  const [hpA, setHpA] = useState(A.stats.hp);
+  const [hpB, setHpB] = useState(B.stats.hp);
+  const [shA, setShA] = useState(A.stats.shield);
+  const [shB, setShB] = useState(B.stats.shield);
+
+  const [poseA, setPoseA] = useState<Pose>(REST_POSE);
+  const [poseB, setPoseB] = useState<Pose>(REST_POSE);
+
+  const [shake,     setShake]     = useState(0);
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const [logIndex,  setLogIndex]  = useState(0);
+  const [finished,  setFinished]  = useState(false);
+  const [skipped,   setSkipped]   = useState(false);
+
+  // refs for the rAF loop to read without re-rendering churn
+  const stateRef = useRef({
+    idx:        0,
+    entryStart: 0,
+    lastT:      0,
+    hpA:        A.stats.hp, hpB: B.stats.hp,
+    shA:        A.stats.shield, shB: B.stats.shield,
+    targetHpA:  A.stats.hp, targetHpB: B.stats.hp,
+    targetShA:  A.stats.shield, targetShB: B.stats.shield,
+    particles:  [] as Particle[],
+    shake:      0,
+    defeatedA:  false,
+    defeatedB:  false,
+  });
   const doneRef = useRef(false);
 
-  const total = result.log.length;
-  const cur   = result.log[Math.min(step, total - 1)];
-  const finished = step >= total - 1;
-
-  useEffect(() => {
-    if (finished) {
-      if (!doneRef.current) { doneRef.current = true; onDone(result.winner); }
-      return;
+  // Spawn particles on hit/crit; colour + count varies by kind.
+  function burst(side: 0 | 1, kind: "hit" | "crit" | "shield") {
+    const xBase = side === 0 ? 150 : -150;     // toward defender
+    const count = kind === "crit" ? 14 : kind === "hit" ? 8 : 5;
+    const colour =
+      kind === "crit"   ? "#fbbf24"
+    : kind === "shield" ? "#60a5fa"
+    :                     "#fb7185";
+    const out: Particle[] = [];
+    for (let i = 0; i < count; i++) {
+      const ang = (Math.random() - 0.5) * Math.PI;
+      const sp  = 120 + Math.random() * (kind === "crit" ? 220 : 120);
+      out.push({
+        id: newPid(),
+        x: xBase + (Math.random() - 0.5) * 30,
+        y: (Math.random() - 0.5) * 60,
+        vx: Math.cos(ang) * sp * (side === 0 ? 1 : -1),
+        vy: Math.sin(ang) * sp - 40,
+        life: 0.55, ttl: 0.55,
+        color: colour,
+        size: kind === "crit" ? 5 : 3,
+      });
     }
-    const t = setTimeout(() => setStep((s) => s + 1), 650);
-    return () => clearTimeout(t);
-  }, [step, finished, onDone, result.winner]);
+    stateRef.current.particles.push(...out);
+  }
 
-  const hpPctA = Math.max(0, cur.hpA / A.stats.hp) * 100;
-  const hpPctB = Math.max(0, cur.hpB / B.stats.hp) * 100;
+  // Apply an entry's pose/shake/particles at progress p (0..1).
+  function applyAnim(entry: LogEntry, p: number) {
+    const s = stateRef.current;
+    let pA: Pose = { ...REST_POSE, dim: s.defeatedA ? 0.35 : 1, tilt: s.defeatedA ? -75 : 0 };
+    let pB: Pose = { ...REST_POSE, dim: s.defeatedB ? 0.35 : 1, tilt: s.defeatedB ? 75 : 0 };
+
+    // direction multipliers — bot 0 faces right, bot 1 faces left
+    const dirA = 1, dirB = -1;
+    // distance the attacker travels in one lunge, pixels
+    const LUNGE = entry.kind === "crit" ? 110 : 80;
+    const RECOIL = entry.kind === "crit" ? 32 : 18;
+
+    if (entry.kind === "hit" || entry.kind === "crit") {
+      const att = entry.actor === 0 ? pA : pB;
+      const def = entry.actor === 0 ? pB : pA;
+      const dir = entry.actor === 0 ? dirA : dirB;
+
+      if (p < 0.45) {
+        // wind up + lunge forward
+        const t = easeOutQuad(p / 0.45);
+        att.tx   = LUNGE * dir * t;
+        att.tilt = (entry.actor === 0 ? -10 : 10) * t;
+      } else if (p < 0.6) {
+        // contact frame — attacker held at extension, defender recoils
+        att.tx   = LUNGE * dir;
+        att.tilt = (entry.actor === 0 ? -10 : 10);
+        const tc = (p - 0.45) / 0.15;
+        def.tx   = -RECOIL * dir * easeOutQuad(tc);
+        def.flash = 1 - tc * 0.5;
+        def.tilt  = (entry.actor === 0 ? 14 : -14) * tc;
+        // Trigger burst + HP commit at the moment of contact (first frame in this window)
+        if (s.lastT < s.entryStart + ENTRY_MS * 0.45) {
+          burst(entry.actor as 0 | 1, entry.kind);
+          if (entry.kind === "crit") s.shake = 1;
+          s.targetHpA = entry.hpA;
+          s.targetHpB = entry.hpB;
+          s.targetShA = entry.shA;
+          s.targetShB = entry.shB;
+        }
+      } else {
+        // recover
+        const t = (p - 0.6) / 0.4;
+        att.tx   = LUNGE * dir * (1 - easeInQuad(t));
+        att.tilt = (entry.actor === 0 ? -10 : 10) * (1 - t);
+        def.tx   = -RECOIL * dir * (1 - t);
+        def.flash = 0.5 * (1 - t);
+        def.tilt  = (entry.actor === 0 ? 14 : -14) * (1 - t);
+      }
+    } else if (entry.kind === "dodge") {
+      // The defender (actor) sidesteps; the attacker (1 - actor) lunges into empty air.
+      const def = entry.actor === 0 ? pA : pB;
+      const att = entry.actor === 0 ? pB : pA;
+      const dirAtt = entry.actor === 0 ? dirB : dirA;
+      const dirDef = entry.actor === 0 ? dirA : dirB;
+
+      if (p < 0.45) {
+        const t = easeOutQuad(p / 0.45);
+        att.tx = 80 * dirAtt * t;
+        att.tilt = (entry.actor === 0 ? 10 : -10) * t;
+      } else if (p < 0.65) {
+        att.tx = 80 * dirAtt;
+        att.tilt = (entry.actor === 0 ? 10 : -10);
+        const t = (p - 0.45) / 0.2;
+        def.tx = -40 * dirDef * easeOutQuad(t);
+        def.scale = 1 - 0.05 * t;
+      } else {
+        const t = (p - 0.65) / 0.35;
+        att.tx = 80 * dirAtt * (1 - easeInQuad(t));
+        att.tilt = (entry.actor === 0 ? 10 : -10) * (1 - t);
+        def.tx = -40 * dirDef * (1 - t);
+        def.scale = 1 - 0.05 * (1 - t);
+      }
+    } else if (entry.kind === "counter") {
+      // Defender (actor) strikes back at the attacker (1 - actor).
+      const ctr = entry.actor === 0 ? pA : pB;
+      const opp = entry.actor === 0 ? pB : pA;
+      const dirC = entry.actor === 0 ? dirA : dirB;
+      if (p < 0.45) {
+        const t = easeOutQuad(p / 0.45);
+        ctr.tx = 70 * dirC * t;
+      } else if (p < 0.6) {
+        ctr.tx = 70 * dirC;
+        const t = (p - 0.45) / 0.15;
+        opp.tx = -16 * dirC * easeOutQuad(t);
+        opp.flash = 1 - t * 0.4;
+        if (s.lastT < s.entryStart + ENTRY_MS * 0.45) {
+          burst(entry.actor as 0 | 1, "hit");
+          s.targetHpA = entry.hpA;
+          s.targetHpB = entry.hpB;
+        }
+      } else {
+        const t = (p - 0.6) / 0.4;
+        ctr.tx = 70 * dirC * (1 - easeInQuad(t));
+        opp.tx = -16 * dirC * (1 - t);
+        opp.flash = 0.4 * (1 - t);
+      }
+    } else if (entry.kind === "shield") {
+      const def = entry.actor === 0 ? pA : pB;
+      def.scale = 1.05;
+      // Use flash as a "blue glow" channel — render layer interprets shield via colour swap below
+      def.flash = 0.4;
+      if (s.lastT < s.entryStart + ENTRY_MS * 0.2) {
+        burst(entry.actor as 0 | 1, "shield");
+        s.targetShA = entry.shA;
+        s.targetShB = entry.shB;
+      }
+    } else if (entry.kind === "win") {
+      // The loser tips over once (HP already at 0).
+      if (entry.hpA <= 0 && !s.defeatedA) s.defeatedA = true;
+      if (entry.hpB <= 0 && !s.defeatedB) s.defeatedB = true;
+      pA.dim  = s.defeatedA ? 0.35 : 1;
+      pA.tilt = s.defeatedA ? -75 : 0;
+      pB.dim  = s.defeatedB ? 0.35 : 1;
+      pB.tilt = s.defeatedB ? 75 : 0;
+    }
+
+    setPoseA(pA);
+    setPoseB(pB);
+  }
+
+  // Skip to the end: instantly apply final HP + winner state.
+  function skipToEnd() {
+    setSkipped(true);
+    setLogIndex(result.log.length - 1);
+    const last = result.log[result.log.length - 1];
+    stateRef.current.hpA = last.hpA;
+    stateRef.current.hpB = last.hpB;
+    stateRef.current.shA = last.shA;
+    stateRef.current.shB = last.shB;
+    stateRef.current.defeatedA = last.hpA <= 0;
+    stateRef.current.defeatedB = last.hpB <= 0;
+    setHpA(last.hpA); setHpB(last.hpB);
+    setShA(last.shA); setShB(last.shB);
+    setFinished(true);
+  }
+
+  // rAF loop driving the timeline
+  useEffect(() => {
+    if (skipped || finished) return;
+    let raf = 0;
+    function loop(now: number) {
+      const s = stateRef.current;
+      const dt = s.lastT ? Math.min(0.05, (now - s.lastT) / 1000) : 0;
+      s.lastT = now;
+      if (!s.entryStart) s.entryStart = now;
+
+      const entry = result.log[s.idx];
+      const elapsed = now - s.entryStart;
+      const p = Math.min(1, elapsed / ENTRY_MS);
+
+      applyAnim(entry, p);
+
+      // Smoothly tween displayed HP / shield toward targets
+      const tween = (cur: number, tgt: number) =>
+        Math.abs(cur - tgt) < 0.5 ? tgt : cur + (tgt - cur) * Math.min(1, dt * 8);
+      s.hpA = tween(s.hpA, s.targetHpA);
+      s.hpB = tween(s.hpB, s.targetHpB);
+      s.shA = tween(s.shA, s.targetShA);
+      s.shB = tween(s.shB, s.targetShB);
+      setHpA(Math.round(s.hpA));
+      setHpB(Math.round(s.hpB));
+      setShA(Math.round(s.shA));
+      setShB(Math.round(s.shB));
+
+      // Particles
+      if (s.particles.length) {
+        for (const pt of s.particles) {
+          pt.x += pt.vx * dt;
+          pt.y += pt.vy * dt;
+          pt.vy += 380 * dt;        // gravity
+          pt.life -= dt;
+        }
+        s.particles = s.particles.filter((pt) => pt.life > 0);
+        setParticles([...s.particles]);
+      } else if (particles.length) {
+        setParticles([]);
+      }
+
+      // Screen-shake decay
+      if (s.shake > 0) {
+        s.shake = Math.max(0, s.shake - dt * 4);
+        setShake(s.shake);
+      } else if (shake !== 0) setShake(0);
+
+      // Advance to next entry
+      if (p >= 1) {
+        if (s.idx >= result.log.length - 1) {
+          setFinished(true);
+          if (!doneRef.current) { doneRef.current = true; onDone(result.winner); }
+          return;
+        }
+        s.idx += 1;
+        setLogIndex(s.idx);
+        s.entryStart = now;
+      }
+      raf = requestAnimationFrame(loop);
+    }
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skipped, finished]);
+
+  const hpPctA = Math.max(0, hpA / A.stats.hp) * 100;
+  const hpPctB = Math.max(0, hpB / B.stats.hp) * 100;
+  const shakeStyle = shake > 0 ? {
+    transform: `translate(${(Math.random() - 0.5) * 10 * shake}px, ${(Math.random() - 0.5) * 10 * shake}px)`,
+  } : undefined;
 
   return (
     <div className="max-w-3xl mx-auto w-full">
       {/* Health bars */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-2 gap-4 mb-3">
         {[
-          { f: A, pct: hpPctA, hp: cur.hpA, sh: cur.shA },
-          { f: B, pct: hpPctB, hp: cur.hpB, sh: cur.shB },
+          { f: A, pct: hpPctA, hp: hpA, sh: shA },
+          { f: B, pct: hpPctB, hp: hpB, sh: shB },
         ].map(({ f, pct, hp, sh }, i) => (
           <div key={i}>
             <div className="flex items-center justify-between text-[12px] mb-1">
@@ -668,7 +961,7 @@ function Battle({ A, B, onDone, onExit, onRematch }: {
               </span>
             </div>
             <div className="h-3 rounded-full bg-bg-700 overflow-hidden">
-              <div className={`h-full transition-all duration-500 ${
+              <div className={`h-full transition-[width] duration-150 ease-out ${
                 pct > 50 ? "bg-ok" : pct > 25 ? "bg-warn" : "bg-err"
               }`} style={{ width: `${pct}%` }} />
             </div>
@@ -676,19 +969,50 @@ function Battle({ A, B, onDone, onExit, onRematch }: {
         ))}
       </div>
 
-      {/* Arena */}
-      <div className="rounded-2xl border border-bg-600 bg-bg-800/50 px-6 py-6 mb-4 flex items-center justify-around min-h-[180px]">
-        <RobotFigure build={A.build}
-          hurt={cur.kind === "hit" || cur.kind === "crit" ? cur.hpA < (result.log[Math.max(0, step - 1)]?.hpA ?? Infinity) : false} />
-        <div className="text-[22px] font-black text-gray-600">VS</div>
-        <RobotFigure build={B.build} facing={-1}
-          hurt={cur.kind === "hit" || cur.kind === "crit" ? cur.hpB < (result.log[Math.max(0, step - 1)]?.hpB ?? Infinity) : false} />
+      {/* Arena — fixed-height stage with absolutely positioned fighters */}
+      <div className="relative rounded-2xl border border-bg-600 bg-gradient-to-b from-bg-800/40 to-bg-900/60 overflow-hidden mb-3"
+           style={{ height: 230, ...shakeStyle }}>
+        {/* Floor line */}
+        <div className="absolute left-0 right-0 bottom-12 h-px bg-bg-600/60" />
+
+        {/* Fighter A — left side, faces right */}
+        <FighterStage
+          build={A.build}
+          pose={poseA}
+          side="left"
+        />
+        {/* Fighter B — right side, faces left */}
+        <FighterStage
+          build={B.build}
+          pose={poseB}
+          side="right"
+        />
+
+        {/* Particles */}
+        {particles.map((pt) => (
+          <div key={pt.id}
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              left: `calc(50% + ${pt.x}px)`,
+              top:  `calc(50% + ${pt.y}px)`,
+              width:  pt.size, height: pt.size,
+              background: pt.color,
+              opacity: Math.max(0, pt.life / pt.ttl),
+              boxShadow: `0 0 ${pt.size * 2}px ${pt.color}`,
+            }}
+          />
+        ))}
+
+        {/* Round number / current action label */}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] font-mono uppercase tracking-widest text-gray-500">
+          {finished ? "FIGHT OVER" : `Round ${Math.floor(logIndex / 4) + 1}`}
+        </div>
       </div>
 
-      {/* Battle log (last 5 entries) */}
-      <div className="rounded-xl border border-bg-600 bg-bg-800/60 p-3 mb-4 min-h-[120px]">
-        {result.log.slice(Math.max(0, step - 4), step + 1).map((e, i) => (
-          <div key={i} className={`text-[12px] py-0.5 ${
+      {/* Battle log — last 3 lines */}
+      <div className="rounded-xl border border-bg-600 bg-bg-800/60 p-3 mb-3 min-h-[80px]">
+        {result.log.slice(Math.max(0, logIndex - 2), logIndex + 1).map((e, i) => (
+          <div key={`${logIndex}-${i}`} className={`text-[12px] py-0.5 ${
             e.kind === "crit"    ? "text-warn font-semibold"
             : e.kind === "dodge"   ? "text-accent"
             : e.kind === "counter" ? "text-violet-400"
@@ -705,7 +1029,7 @@ function Battle({ A, B, onDone, onExit, onRematch }: {
       {/* Controls */}
       <div className="flex items-center gap-2 flex-wrap">
         {!finished && (
-          <button onClick={() => setStep(total - 1)}
+          <button onClick={skipToEnd}
             className="px-3 py-2 rounded-md text-[12px] font-medium text-gray-300 bg-bg-700 border border-bg-600 hover:border-accent/40">
             Skip to result
           </button>
@@ -729,6 +1053,32 @@ function Battle({ A, B, onDone, onExit, onRematch }: {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** A single fighter rendered with its current pose. Positioned absolutely
+ *  within the arena container. */
+function FighterStage({ build, pose, side }: {
+  build: BotGate[]; pose: Pose; side: "left" | "right";
+}) {
+  const sideX = side === "left" ? "22%" : "78%";
+  const facing = side === "left" ? 1 : -1;
+  return (
+    <div
+      className="absolute bottom-6"
+      style={{
+        left: sideX,
+        transform: `translate(calc(-50% + ${pose.tx}px), 0) rotate(${pose.tilt}deg) scale(${pose.scale})`,
+        opacity: pose.dim,
+        filter: pose.flash > 0
+          ? `drop-shadow(0 0 ${10 * pose.flash}px rgba(248, 113, 113, ${pose.flash * 0.9})) saturate(${1 + pose.flash})`
+          : undefined,
+        transition: "transform 16ms linear, filter 80ms linear",
+        transformOrigin: "bottom center",
+      }}
+    >
+      <RobotFigure build={build} facing={facing as 1 | -1} />
     </div>
   );
 }

@@ -192,12 +192,24 @@ export default function App() {
                   />
                 )}
 
-                {/* Left sidebar — overlays the canvas on mobile, in-flow on md+ */}
+                {/* Left sidebar — full-screen overlay on mobile (otherwise it
+                    takes only ~200 px of a 375 px phone and the canvas is
+                    unusable), in-flow on md+. The `[&>aside]:!w-full` selector
+                    overrides the Sidebar's hard-coded width on mobile. */}
                 {sidebarOpen && (
                   <div className={isMobile
-                    ? "absolute left-0 top-0 bottom-0 z-40 shadow-2xl"
+                    ? "absolute inset-0 z-40 shadow-2xl [&>aside]:!w-full"
                     : "flex"}>
                     <Sidebar selected={pendingType} onSelect={handleSidebarSelect} />
+                    {isMobile && (
+                      <button
+                        onClick={() => setSidebarOpen(false)}
+                        title="Close palette"
+                        className="absolute top-2 right-2 w-9 h-9 rounded-full bg-bg-800 border border-bg-600 text-gray-300 hover:text-accent hover:border-accent/50 flex items-center justify-center shadow-lg"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                    )}
                   </div>
                 )}
                 {!isMobile && (
@@ -267,13 +279,22 @@ export default function App() {
                 )}
                 {rightOpen && (
                   <div className={isMobile
-                    ? "absolute right-0 top-0 bottom-0 z-40 shadow-2xl"
+                    ? "absolute inset-0 z-40 shadow-2xl [&>aside]:!w-full"
                     : "flex"}>
                     <RightPanel
                       tab={rightTab}
                       setTab={setRightTab}
                       selectedGateId={selectedGateId}
                     />
+                    {isMobile && (
+                      <button
+                        onClick={() => setRightOpen(false)}
+                        title="Close analysis panel"
+                        className="absolute top-2 right-2 w-9 h-9 rounded-full bg-bg-800 border border-bg-600 text-gray-300 hover:text-accent hover:border-accent/50 flex items-center justify-center shadow-lg z-10"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { X, Gamepad2, ChevronRight, Zap, Cpu, Table2, MousePointer2 } from "lucide-react";
+import { X, Gamepad2, ChevronRight, Zap, Cpu, Table2, MousePointer2, Activity } from "lucide-react";
 import { SignalMaze } from "./SignalMaze";
 import { OverrideMode } from "./OverrideMode";
 import { BuildTable } from "./BuildTable";
+import { SignalRunner } from "./SignalRunner";
 
-type GameId = "menu" | "maze" | "override" | "build";
+type GameId = "menu" | "maze" | "override" | "build" | "runner";
 
 interface Props {
   onClose: () => void;
@@ -33,6 +34,7 @@ export function GameScreen({ onClose }: Props) {
             <span className="text-[12px] text-gray-300">
               {game === "maze" ? "Signal Maze"
                 : game === "override" ? "Override the Mainframe"
+                : game === "runner"   ? "Signal Runner"
                 : "Build the Table"}
             </span>
           </>
@@ -50,6 +52,7 @@ export function GameScreen({ onClose }: Props) {
       {game === "maze"     && <SignalMaze />}
       {game === "override" && <OverrideMode />}
       {game === "build"    && <BuildTable />}
+      {game === "runner"   && <SignalRunner />}
     </div>
   );
 }
@@ -67,12 +70,20 @@ function Launcher({ onPick }: { onPick: (g: GameId) => void }) {
 
         <div className="grid md:grid-cols-2 gap-5">
           <GameCard
+            icon={<Activity size={22} />}
+            tag="Arcade · 2D Runner"
+            title="Signal Runner"
+            blurb="Race a HIGH/LOW signal through a stream of logic gates. Switch lanes to match each gate's required input — match it, score; mismatch it, lose HP. VCC heals, CLOCK slows time, NOT flips your lane. Touch + keyboard."
+            cta="Start the run →"
+            highlight
+            onClick={() => onPick("runner")}
+          />
+          <GameCard
             icon={<MousePointer2 size={22} />}
             tag="Build on the canvas"
             title="Canvas Challenge"
             blurb="A random truth table is your goal. Drag real gates from the palette, wire them between A, B and Y on the actual editor. Hit Check — every input combination is simulated and compared to the target. Match every row to win."
             cta="Start building →"
-            highlight
             onClick={() => window.dispatchEvent(new CustomEvent("logicgate:start-challenge", { detail: { nIn: 2 } }))}
           />
           <GameCard

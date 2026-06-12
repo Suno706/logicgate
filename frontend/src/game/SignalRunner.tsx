@@ -42,9 +42,10 @@ const BEST_KEY = "logicgate.runner.best";
 let _id = 1;
 const nextId = () => _id++;
 
-function randomGate(level: number): GateKind {
+function randomGate(_elapsedSec: number): GateKind {
   const r = Math.random();
-  // Higher levels: more hazards, fewer boosts
+  // The elapsed-time parameter is currently unused but kept so we can
+  // tune spawn weights by difficulty later without changing call sites.
   if (r < 0.04) return "VCC";
   if (r < 0.08) return "CLOCK";
   if (r < 0.13) return "NOT";

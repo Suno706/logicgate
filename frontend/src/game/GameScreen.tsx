@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { X, Gamepad2, ChevronRight, Zap, Cpu, Table2, MousePointer2, Activity, Bot } from "lucide-react";
+import { X, Gamepad2, ChevronRight, Zap, Cpu, MousePointer2, Activity, Bot } from "lucide-react";
 import { SignalMaze } from "./SignalMaze";
 import { OverrideMode } from "./OverrideMode";
-import { BuildTable } from "./BuildTable";
 import { SignalRunner } from "./SignalRunner";
 import { GateBots } from "./GateBots";
 
-type GameId = "menu" | "maze" | "override" | "build" | "runner" | "bots";
+type GameId = "menu" | "maze" | "override" | "runner" | "bots";
 
 interface Props {
   onClose: () => void;
@@ -36,8 +35,7 @@ export function GameScreen({ onClose }: Props) {
               {game === "maze" ? "Signal Maze"
                 : game === "override" ? "Override the Mainframe"
                 : game === "runner"   ? "Signal Runner"
-                : game === "bots"     ? "Gate Bots"
-                : "Build the Table"}
+                : "Gate Bots"}
             </span>
           </>
         )}
@@ -58,7 +56,6 @@ export function GameScreen({ onClose }: Props) {
         {game === "menu" && <Launcher onPick={setGame} />}
         {game === "maze"     && <SignalMaze />}
         {game === "override" && <OverrideMode />}
-        {game === "build"    && <BuildTable />}
         {game === "runner"   && <SignalRunner />}
         {game === "bots"     && <GateBots />}
       </div>
@@ -110,14 +107,6 @@ function Launcher({ onPick }: { onPick: (g: GameId) => void }) {
             blurb="Route a signal through a chain of gates to light the LED. Every level is freshly generated — never the same puzzle twice."
             cta="Start solving →"
             onClick={() => onPick("maze")}
-          />
-          <GameCard
-            icon={<Table2 size={22} />}
-            tag="Procedural · Puzzle"
-            title="Build the Table"
-            blurb="A random truth table appears. Pick gates from a palette so your output column matches the target row by row. New table every round."
-            cta="Match the table →"
-            onClick={() => onPick("build")}
           />
           <GameCard
             icon={<Zap size={22} />}

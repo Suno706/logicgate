@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { X, Gamepad2, ChevronRight, Zap, Cpu, MousePointer2 } from "lucide-react";
+import { X, Gamepad2, ChevronRight, Zap, Cpu, MousePointer2, Worm } from "lucide-react";
 import { SignalMaze } from "./SignalMaze";
 import { OverrideMode } from "./OverrideMode";
+import { SignalRunner } from "./SignalRunner";
 
-type GameId = "menu" | "maze" | "override";
+type GameId = "menu" | "maze" | "override" | "snake";
 
 interface Props {
   onClose: () => void;
@@ -30,7 +31,9 @@ export function GameScreen({ onClose }: Props) {
             </button>
             <ChevronRight size={12} className="text-gray-600" />
             <span className="text-[12px] text-gray-300">
-              {game === "maze" ? "Signal Maze" : "Override the Mainframe"}
+              {game === "maze"     ? "Signal Maze"
+                : game === "snake" ? "Signal Snake"
+                : "Override the Mainframe"}
             </span>
           </>
         )}
@@ -50,6 +53,7 @@ export function GameScreen({ onClose }: Props) {
            style={{ WebkitOverflowScrolling: "touch" }}>
         {game === "menu" && <Launcher onPick={setGame} />}
         {game === "maze"     && <SignalMaze />}
+        {game === "snake"    && <SignalRunner />}
         {game === "override" && <OverrideMode />}
       </div>
     </div>
@@ -69,12 +73,20 @@ function Launcher({ onPick }: { onPick: (g: GameId) => void }) {
 
         <div className="grid md:grid-cols-2 gap-5">
           <GameCard
+            icon={<Worm size={22} />}
+            tag="Arcade · Snake × Runner"
+            title="Signal Snake"
+            blurb="You're a logic signal slithering through a grid. Eat 0/1 bits to grow and switch your value, pass through logic gates that match your current value for big points, dodge the ones that don't. Crash into a wall or your own tail and the run ends."
+            cta="Start the run →"
+            highlight
+            onClick={() => onPick("snake")}
+          />
+          <GameCard
             icon={<MousePointer2 size={22} />}
             tag="Build on the canvas"
             title="Canvas Challenge"
             blurb="A random truth table is your goal. Drag real gates from the palette, wire them between A, B and Y on the actual editor. Hit Check — every input combination is simulated and compared to the target. Match every row to win."
             cta="Start building →"
-            highlight
             onClick={() => window.dispatchEvent(new CustomEvent("logicgate:start-challenge", { detail: { nIn: 2 } }))}
           />
           <GameCard

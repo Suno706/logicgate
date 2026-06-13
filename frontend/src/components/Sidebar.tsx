@@ -157,7 +157,7 @@ export function Sidebar({ selected, onSelect }: Props) {
   }
 
   return (
-    <aside className="w-[200px] flex-shrink-0 bg-bg-800 border-r border-bg-600 flex flex-col overflow-y-auto">
+    <aside className="w-[200px] flex-shrink-0 bg-bg-800 border-r border-bg-600 flex flex-col overflow-y-auto overscroll-contain">
 
       {/* ─── Primitive gates ─── */}
       <div className="px-3 py-2 border-b border-bg-600 flex-shrink-0">

@@ -67,6 +67,12 @@ html.light {
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
   }
   * { box-sizing: border-box; }
+  /* iOS Safari only enables finger-flick momentum scrolling when this
+     property is set directly on the scrolling element. Tailwind doesn't
+     ship it as a utility and we have ~10 scroll containers across the
+     panels/games — applying it universally here keeps mobile feeling
+     native without touching every component. Desktop browsers ignore it. */
+  *, *::before, *::after { -webkit-overflow-scrolling: touch; }
   ::-webkit-scrollbar       { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: var(--lg-scroll-track); }
   ::-webkit-scrollbar-thumb { background: var(--lg-scroll-thumb); border-radius: 3px; }

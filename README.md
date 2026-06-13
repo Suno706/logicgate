@@ -75,7 +75,7 @@ cd frontend && npm install && npm run build && cd ..
 python app.py        # http://localhost:5000 — your computer only
 ```
 
-See [DEPLOY_PUBLIC.md](DEPLOY_PUBLIC.md) for step-by-step Render / Fly.io / Railway guides.
+Production runs on [HuggingFace Spaces](https://huggingface.co/spaces/sunooooooo/logicgate). See [DEPLOY.md](DEPLOY.md) for the Docker SDK setup.
 
 ---
 

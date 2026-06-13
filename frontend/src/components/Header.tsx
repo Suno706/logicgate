@@ -261,7 +261,7 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
 
   return (
     <>
-      <header className="h-12 bg-bg-800 border-b border-bg-600 flex items-center px-3 gap-1 flex-shrink-0 overflow-x-auto">
+      <header className="min-h-12 py-1 bg-bg-800 border-b border-bg-600 flex flex-wrap items-center px-3 gap-1 flex-shrink-0">
 
         {/* Logo */}
         <div className="flex items-center gap-2 mr-3 flex-shrink-0">

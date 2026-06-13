@@ -198,7 +198,7 @@ export default function App() {
                     overrides the Sidebar's hard-coded width on mobile. */}
                 {sidebarOpen && (
                   <div className={isMobile
-                    ? "absolute inset-0 z-40 shadow-2xl [&>aside]:!w-full"
+                    ? "absolute inset-0 z-40 shadow-2xl [&>aside]:!w-full [&>aside]:!h-full"
                     : "flex"}>
                     <Sidebar selected={pendingType} onSelect={handleSidebarSelect} />
                     {isMobile && (
@@ -279,7 +279,7 @@ export default function App() {
                 )}
                 {rightOpen && (
                   <div className={isMobile
-                    ? "absolute inset-0 z-40 shadow-2xl [&>aside]:!w-full"
+                    ? "absolute inset-0 z-40 shadow-2xl [&>aside]:!w-full [&>aside]:!h-full"
                     : "flex"}>
                     <RightPanel
                       tab={rightTab}

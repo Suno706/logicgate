@@ -43,6 +43,16 @@ export function Canvas({ tool, snapGrid, pendingType, onClearPending, onGateSele
   /* mutable interaction refs — avoid stale closure in pointer events */
   const dragRef   = useRef<{ ids: string[]; origins: { id: string; x: number; y: number }[]; startW: { x: number; y: number } } | null>(null);
   const panRef    = useRef<{ startS: { x: number; y: number }; startPan: { x: number; y: number } } | null>(null);
+  /* Active touch pointers — populated on every pointer-down/up. When two
+     fingers are down we switch into pinch mode: tracking the midpoint for
+     pan and the inter-finger distance for zoom. */
+  const touchesRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef   = useRef<{
+    startDist: number; startZoom: number;
+    startMid:  { x: number; y: number };
+    startPan:  { x: number; y: number };
+    startWorld:{ x: number; y: number };   // world point under the midpoint
+  } | null>(null);
   const selBoxRef = useRef<{ startW: { x: number; y: number } } | null>(null);
   /* Click-vs-drag detection: if a pointer-down on a gate releases without
      moving more than CLICK_THRESHOLD world units, treat it as a click. */
@@ -103,8 +113,62 @@ export function Canvas({ tool, snapGrid, pendingType, onClearPending, onGateSele
 
   function snap(v: number) { return snapGrid ? snapToGrid(v, GRID) : Math.round(v); }
 
+  /* ── pinch zoom + two-finger pan ───────────────────────────────── */
+  function startPinch() {
+    const [a, b] = Array.from(touchesRef.current.values());
+    if (!a || !b) return;
+    const mid  = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    // World point under the midpoint, captured at gesture start; we
+    // anchor zoom to it so the pinch feels like it's centred on the
+    // user's fingers rather than the origin.
+    const wx = (mid.x - panState.current.x) / zoomState.current;
+    const wy = (mid.y - panState.current.y) / zoomState.current;
+    pinchRef.current = {
+      startDist:  dist,
+      startZoom:  zoomState.current,
+      startMid:   mid,
+      startPan:   panState.current,
+      startWorld: { x: wx, y: wy },
+    };
+  }
+
+  function updatePinch() {
+    const pinch = pinchRef.current;
+    const [a, b] = Array.from(touchesRef.current.values());
+    if (!pinch || !a || !b) return;
+    const mid  = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const ratio = dist / pinch.startDist;
+    const newZoom = Math.min(2.5, Math.max(0.25, pinch.startZoom * ratio));
+    // Translate so the world point under the start-midpoint sits under
+    // the current midpoint at the new zoom level — that's what makes
+    // the pinch feel anchored.
+    const panX = mid.x - pinch.startWorld.x * newZoom;
+    const panY = mid.y - pinch.startWorld.y * newZoom;
+    setZoom(newZoom);
+    setPan({ x: panX, y: panY });
+  }
+
   /* ── pointer down ───────────────────────────────────────────────── */
   function onPointerDown(e: PointerEvent<SVGSVGElement>) {
+    // Track all active touch contacts. Once two are down we're in pinch
+    // mode regardless of the current tool, which gives mobile users a
+    // universal two-finger pan/zoom without having to switch to Pan.
+    if (e.pointerType === "touch") {
+      const sxAbs = e.clientX - svgRect().left;
+      const syAbs = e.clientY - svgRect().top;
+      touchesRef.current.set(e.pointerId, { x: sxAbs, y: syAbs });
+      if (touchesRef.current.size === 2) {
+        startPinch();
+        // Drop any in-progress single-finger drag — pinch wins.
+        panRef.current  = null;
+        dragRef.current = null;
+        selBoxRef.current = null;
+        return;
+      }
+    }
+
     e.currentTarget.setPointerCapture(e.pointerId);
     const w = toWorld(e.clientX, e.clientY);
     const sx = e.clientX - svgRect().left;
@@ -191,6 +255,19 @@ export function Canvas({ tool, snapGrid, pendingType, onClearPending, onGateSele
 
   /* ── pointer move ───────────────────────────────────────────────── */
   function onPointerMove(e: PointerEvent<SVGSVGElement>) {
+    // Two-finger gesture: update the live touch position and recompute
+    // pan + zoom from the inter-finger distance and midpoint shift.
+    if (e.pointerType === "touch" && touchesRef.current.has(e.pointerId)) {
+      touchesRef.current.set(e.pointerId, {
+        x: e.clientX - svgRect().left,
+        y: e.clientY - svgRect().top,
+      });
+      if (pinchRef.current && touchesRef.current.size >= 2) {
+        updatePinch();
+        return;
+      }
+    }
+
     const sx = e.clientX - svgRect().left;
     const sy = e.clientY - svgRect().top;
     const w  = toWorld(e.clientX, e.clientY);
@@ -224,6 +301,17 @@ export function Canvas({ tool, snapGrid, pendingType, onClearPending, onGateSele
 
   /* ── pointer up ─────────────────────────────────────────────────── */
   function onPointerUp(e: PointerEvent<SVGSVGElement>) {
+    // Multi-touch cleanup. When dropping below 2 fingers we exit pinch
+    // mode; if a finger remains, do nothing else (the user is still in
+    // the middle of a gesture).
+    if (e.pointerType === "touch") {
+      touchesRef.current.delete(e.pointerId);
+      if (pinchRef.current && touchesRef.current.size < 2) {
+        pinchRef.current = null;
+      }
+      if (touchesRef.current.size > 0) return;
+    }
+
     e.currentTarget.releasePointerCapture(e.pointerId);
     const w = toWorld(e.clientX, e.clientY);
 

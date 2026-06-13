@@ -68,6 +68,15 @@ function opposite(a: Direction, b: Direction): boolean {
       || (a === "left" && b === "right") || (a === "right" && b === "left");
 }
 
+function oppositeDir(d: Direction): Direction {
+  switch (d) {
+    case "up":    return "down";
+    case "down":  return "up";
+    case "left":  return "right";
+    case "right": return "left";
+  }
+}
+
 function step(c: Cell, d: Direction): Cell {
   switch (d) {
     case "up":    return { x: c.x,     y: c.y - 1 };
@@ -348,7 +357,7 @@ function spawnInitialPickups(g: any) {
   }
 }
 
-/** One movement tick. Returns false if the snake died. */
+/** One movement tick. Returns false if the snake died (HP exhausted). */
 function stepSnake(g: any): boolean {
   // Apply queued direction change (one per tick)
   if (g.dirQueue.length > 0) {
@@ -358,14 +367,29 @@ function stepSnake(g: any): boolean {
 
   const head = step(g.snake[0], g.dir);
 
-  // Wall collision
-  if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
-    return false;
-  }
-  // Self-collision — we use snake-without-tail for the check because
-  // the tail is about to vacate this tick.
+  // Wall collision — used to be instant-death, but HP was decorative.
+  // Now it costs 1 HP + shortens the snake by 3 segments, and the snake
+  // reverses direction so the next tick takes you back into the field.
+  // When HP hits 0 you're properly out.
+  const hitWall = head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS;
   const checkBody = g.snake.slice(0, -1);
-  if (checkBody.some((c: Cell) => eq(c, head))) return false;
+  const hitSelf   = checkBody.some((c: Cell) => eq(c, head));
+  if (hitWall || hitSelf) {
+    g.hp -= 1;
+    g.combo = 0;
+    g.score = Math.max(0, g.score - 30);
+    pushFloat(g, g.snake[0], "CRASH", "#fb7185");
+    g.flash = 0.7; g.flashKind = "bad";
+    if (g.hp <= 0) return false;
+    // Survival recovery: lose tail length and bounce away from the obstacle.
+    while (g.snake.length > 3 && g.snake.length > g.snake.length - 3) {
+      g.snake.pop();
+    }
+    g.snake = g.snake.slice(0, Math.max(3, g.snake.length - 3));
+    g.dir = oppositeDir(g.dir);
+    g.dirQueue = [];
+    return true;
+  }
 
   // Move
   g.snake.unshift(head);

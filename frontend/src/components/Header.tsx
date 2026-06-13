@@ -359,7 +359,15 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
 
   return (
     <>
-      <header className="h-12 bg-bg-800 border-b border-bg-600 flex items-center px-3 gap-1 flex-shrink-0 overflow-hidden">
+      <header
+        className="h-12 bg-bg-800 border-b border-bg-600 flex items-center px-3 gap-1 flex-shrink-0 relative z-30"
+        // overflow-hidden was clipping the presence dropdown that opens
+        // downward from the room badge — users reported "no joining
+        // members shows". Headers shouldn't suppress popups; the
+        // responsive 'hidden lg:flex' groups below already keep the
+        // toolbar from horizontally overflowing on small screens.
+        style={{ overflowX: "clip", overflowY: "visible" }}
+      >
 
         {/* Logo — clickable wordmark on the left */}
         <div className="flex items-center gap-2 mr-2 flex-shrink-0">
@@ -379,8 +387,8 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
         <ToolBtn icon={<Hand size={13} />}          label="Pan"    title="Pan canvas (H)"
           active={tool === "hand"}   onClick={() => setTool("hand")} />
 
-        {/* Edit + Grid — hidden on small screens, collapsed into the More menu instead */}
-        <div className="hidden lg:flex items-center gap-1">
+        {/* Edit + Grid — hidden on small/medium screens, collapsed into the More menu instead */}
+        <div className="hidden xl:flex items-center gap-1">
           <Divider />
           <ToolBtn icon={<Undo2 size={13} />} title="Undo (Ctrl+Z)"
             disabled={!canUndo} onClick={actions.undo} />
@@ -415,7 +423,7 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
         </button>
 
         {/* Save / Load / Reset / Room — hidden on smaller screens, in More menu instead */}
-        <div className="hidden lg:flex items-center gap-1">
+        <div className="hidden xl:flex items-center gap-1">
           <ToolBtn icon={<StopCircle size={13} />} label="Reset" title="Clear simulation results"
             variant="warning" onClick={actions.clearSimOutputs} />
           <Divider />
@@ -427,11 +435,11 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
             onClick={() => setShowRoom(true)} />
         </div>
 
-        {/* More menu — only on < lg, holds the edit/grid/save/load/room buttons.
+        {/* More menu — only on < xl, holds the edit/grid/save/load/room buttons.
             Keeping the header at a single 48px row was the user's ask; rather
             than wrap or scroll, collapse the secondary controls under one
             tappable overflow button. */}
-        <div className="lg:hidden">
+        <div className="xl:hidden">
           <MoreMenu
             onUndo={actions.undo} canUndo={canUndo}
             onRedo={actions.redo} canRedo={canRedo}

@@ -135,9 +135,11 @@ export function CanvasChallenge({ challenge, onNew, onExit }: Props) {
         </button>
       </div>
 
-      <div className="flex gap-4 items-start">
+      {/* On phones the table + instruction column stacks vertically so
+          neither gets crushed; on md+ they sit side by side. */}
+      <div className="flex flex-col md:flex-row gap-3 md:gap-4 items-stretch md:items-start">
         {/* Target / result table */}
-        <div className="rounded-lg border border-bg-600 overflow-hidden bg-bg-900/40">
+        <div className="rounded-lg border border-bg-600 overflow-hidden bg-bg-900/40 self-start">
           <table className="text-[12px] font-mono tabular-nums">
             <thead className="bg-bg-700/40 text-gray-500 text-[10px]">
               <tr>

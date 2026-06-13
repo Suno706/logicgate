@@ -1,11 +1,9 @@
 import { useState } from "react";
-import { X, Gamepad2, ChevronRight, Zap, Cpu, MousePointer2, Activity, Bot } from "lucide-react";
+import { X, Gamepad2, ChevronRight, Zap, Cpu, MousePointer2 } from "lucide-react";
 import { SignalMaze } from "./SignalMaze";
 import { OverrideMode } from "./OverrideMode";
-import { SignalRunner } from "./SignalRunner";
-import { GateBots } from "./GateBots";
 
-type GameId = "menu" | "maze" | "override" | "runner" | "bots";
+type GameId = "menu" | "maze" | "override";
 
 interface Props {
   onClose: () => void;
@@ -32,10 +30,7 @@ export function GameScreen({ onClose }: Props) {
             </button>
             <ChevronRight size={12} className="text-gray-600" />
             <span className="text-[12px] text-gray-300">
-              {game === "maze" ? "Signal Maze"
-                : game === "override" ? "Override the Mainframe"
-                : game === "runner"   ? "Signal Runner"
-                : "Gate Bots"}
+              {game === "maze" ? "Signal Maze" : "Override the Mainframe"}
             </span>
           </>
         )}
@@ -56,8 +51,6 @@ export function GameScreen({ onClose }: Props) {
         {game === "menu" && <Launcher onPick={setGame} />}
         {game === "maze"     && <SignalMaze />}
         {game === "override" && <OverrideMode />}
-        {game === "runner"   && <SignalRunner />}
-        {game === "bots"     && <GateBots />}
       </div>
     </div>
   );
@@ -71,33 +64,17 @@ function Launcher({ onPick }: { onPick: (g: GameId) => void }) {
           Logic arcade
         </h1>
         <p className="text-[14px] text-gray-400 mb-8 max-w-xl leading-relaxed">
-          Pick a game. Both run entirely in the browser — no scores leave your device.
+          Three logic-themed mini-games — all touch-friendly, all run locally.
         </p>
 
         <div className="grid md:grid-cols-2 gap-5">
-          <GameCard
-            icon={<Bot size={22} />}
-            tag="Strategy · Campaign + 1v1"
-            title="Gate Bots"
-            blurb="Build a fighting robot out of logic gates — every gate type is a different stat (OR = attack, AND = armor, NOT = speed, XOR = crit…). 10 campaign stages with limited inventories and predefined bosses, plus hot-seat 1v1 on one device."
-            cta="Build your bot →"
-            highlight
-            onClick={() => onPick("bots")}
-          />
-          <GameCard
-            icon={<Activity size={22} />}
-            tag="Arcade · 2D Runner"
-            title="Signal Runner"
-            blurb="Race a HIGH/LOW signal through a stream of logic gates. Switch lanes to match each gate's required input — match it, score; mismatch it, lose HP. VCC heals, CLOCK slows time, NOT flips your lane. Touch + keyboard."
-            cta="Start the run →"
-            onClick={() => onPick("runner")}
-          />
           <GameCard
             icon={<MousePointer2 size={22} />}
             tag="Build on the canvas"
             title="Canvas Challenge"
             blurb="A random truth table is your goal. Drag real gates from the palette, wire them between A, B and Y on the actual editor. Hit Check — every input combination is simulated and compared to the target. Match every row to win."
             cta="Start building →"
+            highlight
             onClick={() => window.dispatchEvent(new CustomEvent("logicgate:start-challenge", { detail: { nIn: 2 } }))}
           />
           <GameCard

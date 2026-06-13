@@ -171,19 +171,23 @@ export function SignalMaze() {
           Goal: LED = <span className={puzzle.goal === 1 ? "text-ok font-semibold" : "text-err font-semibold"}>{puzzle.goal}</span>
         </div>
 
-        {/* Gate palette per slot */}
-        <div className="mt-5 grid gap-3" style={{ gridTemplateColumns: `repeat(${puzzle.taps.length}, minmax(0, 1fr))` }}>
+        {/* Gate palette per slot — stacks vertically on phones (one slot
+            per row, full width) so each palette has room for its buttons.
+            On md+ slots lay out as equal columns in the chain via
+            grid-flow-col + auto-cols-fr, which adapts to N-slot puzzles
+            without a runtime media check. */}
+        <div className="mt-5 grid gap-3 grid-cols-1 md:grid-cols-none md:grid-flow-col md:auto-cols-fr">
           {puzzle.taps.map((_, slotIdx) => (
-            <div key={slotIdx} className="flex flex-col gap-1">
+            <div key={slotIdx} className="flex flex-col gap-1 border border-bg-600/40 rounded-lg p-2 md:border-none md:p-0">
               <div className="text-[11px] text-gray-500 text-center">
                 Gate {slotIdx + 1}
                 {picks[slotIdx] && <span className="text-accent ml-1">· {picks[slotIdx]}</span>}
               </div>
-              <div className="flex flex-wrap justify-center gap-1">
+              <div className="flex flex-wrap justify-center gap-1.5">
                 {puzzle.palette.map((g) => (
                   <button key={g}
                     onClick={() => setPickAt(slotIdx, g)}
-                    className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition-colors ${
+                    className={`px-3 py-2 md:px-2 md:py-1 rounded-md text-[12px] md:text-[11px] font-semibold border transition-colors min-h-[40px] md:min-h-0 ${
                       picks[slotIdx] === g
                         ? "bg-accent/15 border-accent text-accent"
                         : "bg-bg-700 border-bg-600 text-gray-300 hover:border-accent/40 hover:text-gray-100"

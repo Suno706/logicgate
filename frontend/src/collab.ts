@@ -15,6 +15,7 @@
  */
 import { io, Socket } from "socket.io-client";
 import type { Gate, Wire, Circuit } from "./types";
+import { getDeviceId } from "./api";
 
 export type RemoteOp =
   | { kind: "add_gate";       payload: { gate: Gate } }
@@ -68,7 +69,10 @@ class CollabClient {
 
     s.on("connect", () => {
       this.mySid = s.id || null;
-      s.emit("join", { room, name });
+      // device_id is the stable identity the server uses for room bans.
+      // Sent on every reconnect so a banned user stays banned even after
+      // they refresh and pick up a new socket sid.
+      s.emit("join", { room, name, device_id: getDeviceId() });
     });
 
     s.on("kicked", (info: { room: string; reason: string }) => {

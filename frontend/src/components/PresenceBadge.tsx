@@ -89,7 +89,15 @@ export function PresenceBadge() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1.5 w-72 z-50 bg-bg-800 border border-bg-600 rounded-lg shadow-xl p-1.5 text-xs">
+        <div
+          className="absolute right-0 mt-1.5 z-50 bg-bg-800 border border-bg-600 rounded-lg shadow-xl p-1.5 text-xs"
+          style={{
+            // On phones the host's presence dropdown was anchored to the
+            // badge, which sits mid-toolbar. A fixed w-72 (288px) would
+            // extend off-screen on the left. Clamp to viewport width so
+            // it always fits and stays tappable.
+            width: "min(288px, 90vw)",
+          }}>
           <div className="flex items-center justify-between px-2 py-1.5 border-b border-bg-600 mb-1">
             <span className="text-[11px] text-gray-400">
               Room <span className="font-mono font-semibold text-gray-100">{code}</span>

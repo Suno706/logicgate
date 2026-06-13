@@ -44,13 +44,21 @@ log = logging.getLogger("logicgate.realtime")
 _rosters: Dict[str, List[dict]] = defaultdict(list)
 # sid -> room (so disconnect knows which room to remove from)
 _sid_room: Dict[str, str] = {}
-# sid -> client IP, captured at join time, used by kick_socket() to identify
-# which IP to add to the per-room ban list.
+# sid -> client IP, captured at join time. IP bans are a fallback for the
+# rare case where a kicked user clears localStorage to drop their device id.
 _sid_ip: Dict[str, str] = {}
-# Per-room ban list keyed by client IP. Populated by kick_socket() and
-# consulted on every join. Survives reconnects (until the server process
-# restarts), so a kicked user can't rejoin by refreshing.
-_banned_ips: Dict[str, Set[str]] = defaultdict(set)
+# sid -> device_id sent by the client on join. This is the primary identity
+# the kick system uses, because:
+#   - IPs collide on shared WiFi / behind HF's proxy (one ban hits everyone)
+#   - device_id is generated once per browser and persists across reloads,
+#     so a kicked user trying to refresh their way back in is recognised
+#     and re-rejected before they ever join the roster.
+_sid_did: Dict[str, str] = {}
+# Per-room ban lists, indexed two ways. A join is refused if it matches
+# *either* set — device_id is checked first because it's the authoritative
+# identity; IP is the backup.
+_banned_devices: Dict[str, Set[str]] = defaultdict(set)
+_banned_ips:     Dict[str, Set[str]] = defaultdict(set)
 # Module-level handle to the live SocketIO instance, used by kick_socket().
 _socketio = None
 
@@ -102,9 +110,13 @@ def kick_socket(room: str, target_sid: str) -> bool:
         return False
     room = actual    # use the real socket-room name from here on
     pretty = room[5:].upper() if room.startswith("room_") else room
-    # Ban this client's IP from re-joining the room. The IP was captured
-    # in the join handler; without it we can only disconnect, and the
-    # user would simply rejoin on refresh.
+    # Record both identities so a future join from this device is refused
+    # regardless of how the client tries to reconnect:
+    #   - device_id survives refresh + reconnect (the reliable path)
+    #   - IP catches the case where a client somehow lost its device_id
+    did = _sid_did.get(target_sid, "")
+    if did:
+        _banned_devices[room].add(did)
     ip = _sid_ip.get(target_sid, "")
     if ip:
         _banned_ips[room].add(ip)
@@ -116,6 +128,7 @@ def kick_socket(room: str, target_sid: str) -> bool:
     _rosters[room] = [u for u in _rosters[room] if u["sid"] != target_sid]
     _sid_room.pop(target_sid, None)
     _sid_ip.pop(target_sid, None)
+    _sid_did.pop(target_sid, None)
     try:
         _socketio.server.disconnect(target_sid, namespace="/collab")
     except Exception:
@@ -154,15 +167,19 @@ def init_socketio(app, cors_allowed_origins="*") -> SocketIO:
     def _on_join(data):
         room = (data or {}).get("room") or "default"
         name = (data or {}).get("name") or "guest"
+        did  = ((data or {}).get("device_id") or "").strip()[:64]
         sid  = request.sid
         ip   = _client_ip(request)
-        # Refuse re-join if this IP has been kicked from the room. The
-        # client gets a 'banned' event and stays out of the roster.
-        if ip and ip in _banned_ips.get(room, set()):
+        # Refuse re-join if this device or IP has been kicked from the room.
+        # device_id takes priority because IPs collide behind HF's proxy.
+        banned_did = did and did in _banned_devices.get(room, set())
+        banned_ip  = ip  and ip  in _banned_ips    .get(room, set())
+        if banned_did or banned_ip:
             pretty = room[5:].upper() if room.startswith("room_") else room
             emit("banned", {"room": pretty,
                             "reason": "You were removed by the host. Ask the host to invite you back."})
-            log.info(f"refused banned IP={ip} attempting to join {room}")
+            log.info(f"refused banned client did={did} ip={ip} room={room} "
+                     f"(via {'device' if banned_did else 'ip'})")
             return
         # If this socket was in another room, remove it first.
         prev = _sid_room.get(sid)
@@ -190,6 +207,8 @@ def init_socketio(app, cors_allowed_origins="*") -> SocketIO:
         _sid_room[sid] = room
         if ip:
             _sid_ip[sid] = ip
+        if did:
+            _sid_did[sid] = did
         # Don't duplicate if reconnecting
         _rosters[room] = [u for u in _rosters[room] if u["sid"] != sid]
         _rosters[room].append({
@@ -216,6 +235,7 @@ def init_socketio(app, cors_allowed_origins="*") -> SocketIO:
         sid = request.sid
         room = _sid_room.pop(sid, None)
         _sid_ip.pop(sid, None)
+        _sid_did.pop(sid, None)
         if room:
             _rosters[room] = [u for u in _rosters[room] if u["sid"] != sid]
             _broadcast_presence(room)

@@ -65,7 +65,7 @@ export function GameScreen({ onClose }: Props) {
 
 function Launcher({ onPick }: { onPick: (g: GameId) => void }) {
   return (
-    <div className="flex-1 overflow-y-auto p-5 md:p-10">
+    <div className="p-5 md:p-10">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-[28px] md:text-[34px] font-bold text-gray-100 mb-2 tracking-tight">
           Logic arcade

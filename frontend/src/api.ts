@@ -15,6 +15,34 @@ function _newSessionId(): string {
 }
 
 /**
+ * Stable device identifier — generated once per browser, kept across
+ * reloads and tab restarts. Used by the realtime layer for room bans
+ * that survive a refresh. We DON'T derive this from session_id because
+ * session_id can change when the user joins/leaves a room. The device
+ * id is purely an identity token: not tied to permissions, not used
+ * for circuit ownership.
+ *
+ * Storing in localStorage means clearing browser data resets it — that's
+ * acceptable; a kicked user determined to come back can always start
+ * over from a clean browser, same as any web ban.
+ */
+const DEVICE_KEY = "logicgate.device_id";
+export function getDeviceId(): string {
+  try {
+    let d = localStorage.getItem(DEVICE_KEY);
+    if (!d) {
+      d = "d_" + Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+      localStorage.setItem(DEVICE_KEY, d);
+    }
+    return d;
+  } catch {
+    // Private mode / disabled storage — fall back to a per-page id so
+    // collab still works, just won't survive a refresh.
+    return "d_ephemeral_" + Math.random().toString(36).slice(2, 12);
+  }
+}
+
+/**
  * Session-id resolution order (per-tab → per-browser):
  *   1. URL ?room=XYZ           — current tab is in room XYZ
  *   2. sessionStorage room    — this tab's room (survives reloads, not tabs)

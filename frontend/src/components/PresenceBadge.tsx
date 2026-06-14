@@ -92,10 +92,21 @@ export function PresenceBadge() {
   // Choose label color: green when 2+ are present (live), gray when alone.
   const live = total >= 2;
 
+  // The dropdown uses position:fixed (not absolute) so it escapes the
+  // top bar's horizontal-scroll overflow. Read the badge's bounding
+  // rect at open time and pin the dropdown below it.
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
+  function toggleDropdown(e: React.MouseEvent<HTMLButtonElement>) {
+    if (open) { setOpen(false); return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    setDropdownPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    setOpen(true);
+  }
+
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggleDropdown}
         className={`flex items-center gap-1.5 px-2 py-1 rounded-md bg-bg-700 border ${
           isOwner ? "border-accent text-accent" : "border-bg-600 hover:border-accent"
         }`}
@@ -133,12 +144,12 @@ export function PresenceBadge() {
 
       {open && (
         <div
-          className="absolute right-0 mt-1.5 z-50 bg-bg-800 border border-bg-600 rounded-lg shadow-xl p-1.5 text-xs"
+          className="fixed z-[60] bg-bg-800 border border-bg-600 rounded-lg shadow-xl p-1.5 text-xs"
           style={{
-            // On phones the host's presence dropdown was anchored to the
-            // badge, which sits mid-toolbar. A fixed w-72 (288px) would
-            // extend off-screen on the left. Clamp to viewport width so
-            // it always fits and stays tappable.
+            // Pinned at the bounding rect of the badge captured at open
+            // time. Clamped to viewport width so it always fits.
+            top:   dropdownPos?.top   ?? 0,
+            right: dropdownPos?.right ?? 8,
             width: "min(288px, 90vw)",
           }}>
           <div className="flex items-center justify-between px-2 py-1.5 border-b border-bg-600 mb-1">

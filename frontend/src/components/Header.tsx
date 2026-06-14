@@ -266,25 +266,17 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
 
   return (
     <>
-      <header className="h-12 bg-bg-800 border-b border-bg-600 flex items-stretch px-3 gap-2 flex-shrink-0 relative z-30">
-
-        {/* SCROLLABLE TOOLBAR — every editor action stays one tap away.
-            Wrapped in its own scroll container so the right-side cluster
-            (presence dropdown, status, theme, user chip) doesn't get
-            clipped when popups open downward.
-
-            Refinements based on user feedback:
-              - Scrollbar visually hidden (it clutters a 48px bar) but
-                we paint a small fade gradient on the right edge to
-                signal that more content lives off-screen.
-              - Mouse wheel rotates horizontally over the toolbar; users
-                shouldn't have to remember Shift+wheel. */}
+      <header className="h-12 bg-bg-800 border-b border-bg-600 flex-shrink-0 relative z-30">
+        {/* ONE SCROLLABLE ROW — top bar is a single horizontally-scrollable
+            row that contains EVERY control: tools, edit, simulate, save,
+            load, room, play, stats, presence, status, theme, user chip.
+            The user explicitly requested "full horizontal scroll".
+            The presence dropdown uses position:fixed (see PresenceBadge)
+            so it escapes this scroll container when it opens. */}
         <div
           ref={toolbarScrollRef}
-          className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto overflow-y-visible toolbar-scroll"
+          className="h-full flex items-center px-3 gap-1 overflow-x-auto overflow-y-visible toolbar-scroll"
           onWheel={(e) => {
-            // Convert vertical wheel into horizontal scroll. Touch-pad
-            // horizontal swipes already work; this catches mouse users.
             const el = e.currentTarget;
             if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
               el.scrollLeft += e.deltaY;
@@ -367,11 +359,15 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
           variant="primary"
           onClick={() => window.dispatchEvent(new CustomEvent("logicgate:open-game"))} />
 
-        </div>{/* /scrollable toolbar */}
+        {/* Spacer pushes the status cluster to the right edge when the
+            row content is narrower than the viewport. min-w-[1rem]
+            prevents items from touching at any width. */}
+        <div className="flex-1 min-w-4" />
 
-        {/* Right-side fixed cluster — lives outside the scroll container
-            so the presence dropdown can open downward without being
-            clipped, and the status indicators always stay anchored. */}
+        {/* Right-side cluster — still inside the single scrolling row,
+            so on a narrow viewport these scroll in with everything
+            else. The presence dropdown uses position:fixed (see
+            PresenceBadge) so it doesn't get clipped by this overflow. */}
         <div className="flex items-center gap-2 flex-shrink-0">
 
         {/* Stats */}
@@ -396,7 +392,9 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
         {/* Identity chip — display name (or "guest") + click to sign out */}
         <UserChip />
 
-        </div>{/* /right-side fixed cluster */}
+        </div>{/* /right-side cluster */}
+
+        </div>{/* /scrollable toolbar row */}
       </header>
 
       {/* ── Save modal ── */}

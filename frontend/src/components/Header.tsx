@@ -100,9 +100,10 @@ function ToolBtn({ icon, label, title, active, disabled, variant = "default", on
     warning: "border-warn/30 text-warn hover:bg-warn/10",
   };
   return (
-    <button title={title} onClick={onClick} disabled={disabled} className={`${base} ${styles[variant]} flex-shrink-0`}>
+    <button title={title} onClick={onClick} disabled={disabled}
+      className={`${base} ${styles[variant]} flex-shrink-0 whitespace-nowrap`}>
       {icon}
-      {label && <span className="hidden md:inline">{label}</span>}
+      {label && <span className="hidden md:inline whitespace-nowrap">{label}</span>}
     </button>
   );
 }
@@ -329,7 +330,7 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
         <button
           onClick={runSim}
           disabled={simming || !circuit.gates.length}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium border border-ok/40 text-ok hover:bg-ok/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium border border-ok/40 text-ok hover:bg-ok/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 whitespace-nowrap"
           title="Run simulation (Ctrl+Enter)"
         >
           {simming

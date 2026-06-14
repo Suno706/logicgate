@@ -3,7 +3,6 @@ import {
   MousePointer2, Spline, Hand, Undo2, Redo2, Trash2, Square,
   Grid3x3, Play, StopCircle, Save, FolderOpen, Wifi, WifiOff,
   Loader2, X, Maximize2, Users, BookOpen, Sun, Moon, LogIn, Gamepad2,
-  MoreHorizontal,
 } from "lucide-react";
 import { getTheme, toggleTheme } from "../theme";
 import type { Tool } from "../types";
@@ -112,102 +111,6 @@ function Divider() {
   return <div className="w-px h-5 bg-bg-600 mx-0.5 flex-shrink-0" />;
 }
 
-/** Overflow menu — the toolbar's secondary actions collapse here when the
- *  viewport is < lg so the top bar stays a single tidy row. Opens as a
- *  dropdown anchored under the trigger. Closes on outside-click and on
- *  any action selection. */
-function MoreMenu({
-  onUndo, canUndo, onRedo, canRedo,
-  onDelete, canDelete, onClear, canClear,
-  snapGrid, onToggleSnap,
-  onFit, canFit,
-  onReset, onSave, onLoad, onRoom,
-  currentRoom,
-}: {
-  onUndo: () => void; canUndo: boolean;
-  onRedo: () => void; canRedo: boolean;
-  onDelete: () => void; canDelete: boolean;
-  onClear: () => void; canClear: boolean;
-  snapGrid: boolean; onToggleSnap: () => void;
-  onFit: () => void; canFit: boolean;
-  onReset: () => void;
-  onSave: () => void; onLoad: () => void; onRoom: () => void;
-  currentRoom: string | null;
-}) {
-  const [open, setOpen] = useState(false);
-
-  // Click-outside to close. Attaches a single listener for the lifetime
-  // of the open state and removes itself on close — no leak.
-  useEffect(() => {
-    if (!open) return;
-    function onDoc(e: MouseEvent) {
-      const t = e.target as HTMLElement;
-      if (!t.closest?.("[data-more-menu]")) setOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
-
-  function run(fn: () => void) { fn(); setOpen(false); }
-
-  const itemCls =
-    "w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-gray-200 " +
-    "hover:bg-bg-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors";
-
-  return (
-    <div className="relative" data-more-menu>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        title="More tools"
-        className="flex items-center gap-1 px-2 py-1.5 rounded-md text-[12px] font-medium border border-bg-600 text-gray-300 hover:border-gray-500 hover:text-gray-100 hover:bg-bg-700 transition-colors flex-shrink-0"
-      >
-        <MoreHorizontal size={14} />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-56 bg-bg-800 border border-bg-600 rounded-lg shadow-xl py-1">
-          <button className={itemCls} disabled={!canUndo}   onClick={() => run(onUndo)}>
-            <Undo2 size={13} className="text-gray-500" /> Undo
-            <span className="ml-auto text-[10px] text-gray-600">Ctrl Z</span>
-          </button>
-          <button className={itemCls} disabled={!canRedo}   onClick={() => run(onRedo)}>
-            <Redo2 size={13} className="text-gray-500" /> Redo
-            <span className="ml-auto text-[10px] text-gray-600">Ctrl Y</span>
-          </button>
-          <button className={itemCls} disabled={!canDelete} onClick={() => run(onDelete)}>
-            <Trash2 size={13} className="text-err/80" /> Delete selected
-            <span className="ml-auto text-[10px] text-gray-600">Del</span>
-          </button>
-          <button className={itemCls} disabled={!canClear}  onClick={() => run(onClear)}>
-            <Square size={13} className="text-gray-500" /> Clear canvas
-          </button>
-          <div className="h-px bg-bg-600 my-1 mx-2" />
-          <button className={itemCls} onClick={() => run(onToggleSnap)}>
-            <Grid3x3 size={13} className={snapGrid ? "text-accent" : "text-gray-500"} />
-            Snap to grid
-            <span className="ml-auto text-[10px] text-gray-500">{snapGrid ? "On" : "Off"}</span>
-          </button>
-          <button className={itemCls} disabled={!canFit}   onClick={() => run(onFit)}>
-            <Maximize2 size={13} className="text-gray-500" /> Fit all gates
-          </button>
-          <button className={itemCls} onClick={() => run(onReset)}>
-            <StopCircle size={13} className="text-warn" /> Reset simulation
-          </button>
-          <div className="h-px bg-bg-600 my-1 mx-2" />
-          <button className={itemCls} onClick={() => run(onSave)}>
-            <Save size={13} className="text-gray-500" /> Save circuit
-          </button>
-          <button className={itemCls} onClick={() => run(onLoad)}>
-            <FolderOpen size={13} className="text-gray-500" /> Load circuit
-          </button>
-          <button className={itemCls} onClick={() => run(onRoom)}>
-            <Users size={13} className={currentRoom ? "text-accent" : "text-gray-500"} />
-            {currentRoom ? `Room ${currentRoom}` : "Join room"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCircuitLoaded }: Props) {
   const state    = useCircuitState();
@@ -359,15 +262,16 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
 
   return (
     <>
-      <header
-        className="h-12 bg-bg-800 border-b border-bg-600 flex items-center px-3 gap-1 flex-shrink-0 relative z-30"
-        // overflow-hidden was clipping the presence dropdown that opens
-        // downward from the room badge — users reported "no joining
-        // members shows". Headers shouldn't suppress popups; the
-        // responsive 'hidden lg:flex' groups below already keep the
-        // toolbar from horizontally overflowing on small screens.
-        style={{ overflowX: "clip", overflowY: "visible" }}
-      >
+      <header className="h-12 bg-bg-800 border-b border-bg-600 flex items-stretch px-3 gap-2 flex-shrink-0 relative z-30">
+
+        {/* SCROLLABLE TOOLBAR — every editor action stays one tap away.
+            Wrapped in its own scroll container so the right-side cluster
+            (presence dropdown, status, theme, user chip) doesn't get
+            clipped when popups open downward. */}
+        <div
+          className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto overflow-y-visible -my-px py-px [&::-webkit-scrollbar]:hidden"
+          style={{ scrollbarWidth: "none" }}
+        >
 
         {/* Logo — clickable wordmark on the left */}
         <div className="flex items-center gap-2 mr-2 flex-shrink-0">
@@ -388,7 +292,7 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
           active={tool === "hand"}   onClick={() => setTool("hand")} />
 
         {/* Edit + Grid — hidden on small/medium screens, collapsed into the More menu instead */}
-        <div className="hidden xl:flex items-center gap-1">
+        <div className="flex items-center gap-1">
           <Divider />
           <ToolBtn icon={<Undo2 size={13} />} title="Undo (Ctrl+Z)"
             disabled={!canUndo} onClick={actions.undo} />
@@ -423,7 +327,7 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
         </button>
 
         {/* Save / Load / Reset / Room — hidden on smaller screens, in More menu instead */}
-        <div className="hidden xl:flex items-center gap-1">
+        <div className="flex items-center gap-1">
           <ToolBtn icon={<StopCircle size={13} />} label="Reset" title="Clear simulation results"
             variant="warning" onClick={actions.clearSimOutputs} />
           <Divider />
@@ -435,27 +339,6 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
             onClick={() => setShowRoom(true)} />
         </div>
 
-        {/* More menu — only on < xl, holds the edit/grid/save/load/room buttons.
-            Keeping the header at a single 48px row was the user's ask; rather
-            than wrap or scroll, collapse the secondary controls under one
-            tappable overflow button. */}
-        <div className="xl:hidden">
-          <MoreMenu
-            onUndo={actions.undo} canUndo={canUndo}
-            onRedo={actions.redo} canRedo={canRedo}
-            onDelete={actions.removeSelected} canDelete={selected.size > 0}
-            onClear={confirmClear} canClear={circuit.gates.length > 0}
-            snapGrid={snapGrid} onToggleSnap={() => setSnapGrid(!snapGrid)}
-            onFit={() => window.dispatchEvent(new CustomEvent("logicgate:fit-view"))}
-            canFit={circuit.gates.length > 0}
-            onReset={actions.clearSimOutputs}
-            onSave={() => setShowSave(true)}
-            onLoad={openLoad}
-            onRoom={() => setShowRoom(true)}
-            currentRoom={currentRoom}
-          />
-        </div>
-
         <Divider />
 
         {/* Logic Arcade — full-screen mini-games. Primary visual weight
@@ -465,7 +348,12 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
           variant="primary"
           onClick={() => window.dispatchEvent(new CustomEvent("logicgate:open-game"))} />
 
-        <div className="flex-1 min-w-4" />
+        </div>{/* /scrollable toolbar */}
+
+        {/* Right-side fixed cluster — lives outside the scroll container
+            so the presence dropdown can open downward without being
+            clipped, and the status indicators always stay anchored. */}
+        <div className="flex items-center gap-2 flex-shrink-0">
 
         {/* Stats */}
         <span className="text-[11px] text-gray-500 whitespace-nowrap mr-2 hidden sm:block tabular-nums">
@@ -488,6 +376,8 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
 
         {/* Identity chip — display name (or "guest") + click to sign out */}
         <UserChip />
+
+        </div>{/* /right-side fixed cluster */}
       </header>
 
       {/* ── Save modal ── */}

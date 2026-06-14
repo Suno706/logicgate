@@ -137,6 +137,7 @@ export function SignalRunner() {
   /* mutable game state */
   const game = useRef({
     snake:      [] as Cell[],            // head at index 0
+    prevSnake:  [] as Cell[],            // snapshot at last tick start, for smooth interpolation between cells
     dir:        "right" as Direction,
     dirQueue:   [] as Direction[],
     value:      1 as 0 | 1,
@@ -147,9 +148,13 @@ export function SignalRunner() {
     bestCombo:  0,
     slowmoUntil: 0,
     lastTickAt: 0,
+    tickInterval: BASE_TICK_MS,          // updated each tick for the renderer
+    bannerCombo: 0,                      // last combo we showed a banner for
+    bannerLife:  0,                      // seconds remaining on combo banner
     flash:      0,
     flashKind:  "none" as "good" | "bad" | "shock" | "none",
     floaters:   [] as { x: number; y: number; text: string; color: string; life: number; ttl: number }[],
+    particles:  [] as { x: number; y: number; vx: number; vy: number; color: string; life: number; ttl: number; size: number }[],
   });
 
   /* ── lifecycle helpers ─────────────────────────────────────── */
@@ -260,8 +265,14 @@ export function SignalRunner() {
         BASE_TICK_MS - Math.floor((g.snake.length - 4) / 5) * SPEED_GAIN_MS,
       ) * (slow ? 1.6 : 1);
 
+      g.tickInterval = tickInterval;
       if (now - g.lastTickAt >= tickInterval) {
         g.lastTickAt = now;
+        // Capture where the snake WAS so the renderer can interpolate
+        // each segment from its prev cell to its new cell. This is the
+        // single biggest "video game" visual upgrade: the snake slides
+        // smoothly between grid cells instead of teleporting.
+        g.prevSnake = g.snake.map((c: Cell) => ({ x: c.x, y: c.y }));
         if (!stepSnake(g)) {
           finishRun(g);
           return;
@@ -269,11 +280,18 @@ export function SignalRunner() {
         syncHud(g);
       }
 
-      // Decay flash/floaters every frame regardless of ticks
+      // Decay flash/floaters/particles/banner every frame
       const dt = 1 / 60;
-      if (g.flash > 0) g.flash = Math.max(0, g.flash - dt * 3);
-      for (const f of g.floaters) f.life -= dt;
-      g.floaters = g.floaters.filter((f) => f.life > 0);
+      if (g.flash > 0)       g.flash = Math.max(0, g.flash - dt * 3);
+      if (g.bannerLife > 0)  g.bannerLife = Math.max(0, g.bannerLife - dt);
+      for (const f of g.floaters)  f.life -= dt;
+      for (const p of g.particles) {
+        p.x += p.vx * dt;  p.y += p.vy * dt;
+        p.vy += 12 * dt;                      // gravity in cell units
+        p.life -= dt;
+      }
+      g.floaters  = g.floaters .filter((f: any) => f.life > 0);
+      g.particles = g.particles.filter((p: any) => p.life > 0);
 
       drawWorld(ctx!, g, now);
 
@@ -417,6 +435,7 @@ function applyPickup(g: any, p: Pickup): boolean {
     g.value = p.value;
     g.score += 10;
     pushFloat(g, head, `${p.value}`, p.value === 1 ? "#34d399" : "#60a5fa");
+    burst(g, head, p.value === 1 ? "#34d399" : "#60a5fa", 8);
     g.flash = 0.25; g.flashKind = "good";
     return true;                       // grow
   }
@@ -425,10 +444,12 @@ function applyPickup(g: any, p: Pickup): boolean {
       g.hp = Math.min(g.hp + 1, 5);
       g.score += 30;
       pushFloat(g, head, "+1 HP", "#34d399");
+      burst(g, head, "#34d399", 16);
     } else {
       g.slowmoUntil = performance.now() + 3000;
       g.score += 30;
       pushFloat(g, head, "SLOW", "#2dd4bf");
+      burst(g, head, "#2dd4bf", 16);
     }
     g.flash = 0.25; g.flashKind = "good";
     return true;
@@ -440,15 +461,41 @@ function applyPickup(g: any, p: Pickup): boolean {
     const points = 50 + Math.floor(g.snake.length / 2) + g.combo * 10;
     g.score += points;
     pushFloat(g, head, `+${points}`, "#a5f3fc");
+    burst(g, head, "#67e8f9", 14);
     g.flash = 0.3; g.flashKind = "good";
+    // Combo banner fires on 3+ — that's where the run feels good and
+    // the player deserves an arcade-style call-out.
+    if (g.combo >= 3 && g.combo !== g.bannerCombo) {
+      g.bannerCombo = g.combo;
+      g.bannerLife  = 1.2;
+    }
   } else {
     g.combo = 0;
     g.hp -= 1;
     g.score = Math.max(0, g.score - 20);
     pushFloat(g, head, "MISS", "#fb7185");
+    burst(g, head, "#fb7185", 18);
     g.flash = 0.5; g.flashKind = "bad";
   }
   return false;                        // gates don't grow you
+}
+
+/** Spawn `count` particles at a cell with a hot fountain. Velocities are
+ *  in *cell units per second* so the renderer can position them on the
+ *  same grid as everything else without unit conversion. */
+function burst(g: any, c: Cell, color: string, count: number) {
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const sp  = 4 + Math.random() * 7;
+    g.particles.push({
+      x: c.x + 0.5, y: c.y + 0.5,
+      vx: Math.cos(ang) * sp,
+      vy: Math.sin(ang) * sp - 4,
+      life: 0.6 + Math.random() * 0.3, ttl: 0.9,
+      color,
+      size: 2 + Math.random() * 2,
+    });
+  }
 }
 
 function pushFloat(g: any, c: Cell, text: string, color: string) {
@@ -484,7 +531,7 @@ function gateCountNow(g: any): number {
    Rendering — canvas drawing functions, no state mutation.
    ───────────────────────────────────────────────────────────────── */
 
-function drawWorld(ctx: CanvasRenderingContext2D, g: any, _now: number) {
+function drawWorld(ctx: CanvasRenderingContext2D, g: any, now: number) {
   const canvas = ctx.canvas;
   const dpr = window.devicePixelRatio || 1;
   const cssW = canvas.clientWidth  || 1;
@@ -506,17 +553,28 @@ function drawWorld(ctx: CanvasRenderingContext2D, g: any, _now: number) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, cssW, cssH);
 
-  // Background
-  ctx.fillStyle = "#0f1117";
+  /* Background — radial gradient + subtle drifting grid scanlines for a
+     CRT / arcade vibe. The drift speed is tied to wall-clock so it
+     reads as movement even when the snake hasn't ticked yet. */
+  const grad = ctx.createRadialGradient(cssW / 2, cssH / 2, 50, cssW / 2, cssH / 2, Math.max(cssW, cssH));
+  grad.addColorStop(0, "#181b25");
+  grad.addColorStop(1, "#0a0c12");
+  ctx.fillStyle = grad;
   ctx.fillRect(0, 0, cssW, cssH);
 
-  // Grid lines
-  ctx.strokeStyle = "#1c1f27";
+  /* Faint scanlines for the video-game feel */
+  ctx.fillStyle = "rgba(255,255,255,0.012)";
+  for (let y = 0; y < cssH; y += 3) ctx.fillRect(0, y, cssW, 1);
+
+  /* Grid lines drifting subtly with time */
+  const drift = (now / 18) % cellSize;
+  ctx.strokeStyle = "#1a1d27";
   ctx.lineWidth   = 1;
   ctx.beginPath();
-  for (let i = 0; i <= COLS; i++) {
-    ctx.moveTo(offX + i * cellSize, offY);
-    ctx.lineTo(offX + i * cellSize, offY + gridH);
+  for (let i = 0; i <= COLS + 1; i++) {
+    const x = offX + i * cellSize - drift;
+    if (x < offX || x > offX + gridW) continue;
+    ctx.moveTo(x, offY); ctx.lineTo(x, offY + gridH);
   }
   for (let j = 0; j <= ROWS; j++) {
     ctx.moveTo(offX,         offY + j * cellSize);
@@ -524,20 +582,48 @@ function drawWorld(ctx: CanvasRenderingContext2D, g: any, _now: number) {
   }
   ctx.stroke();
 
-  // Border
+  /* Border — accent glow around the playfield */
+  ctx.save();
+  ctx.shadowColor = "#2dd4bf";
+  ctx.shadowBlur  = 14;
   ctx.strokeStyle = "#2a2f3d";
   ctx.lineWidth   = 2;
   ctx.strokeRect(offX, offY, gridW, gridH);
+  ctx.restore();
 
-  // Pickups
-  for (const p of g.pickups) drawPickup(ctx, p, offX, offY, cellSize);
+  /* Pickups — drawn with a subtle bob synced to clock */
+  for (const p of g.pickups) drawPickup(ctx, p, offX, offY, cellSize, now);
 
-  // Snake — tail to head so the head paints on top
+  /* Snake — interpolate each segment from its previous cell to its
+     current cell based on how far into this tick we are. Renders the
+     whole body sliding smoothly between grid positions. Tail-to-head
+     paint order keeps the glowing head on top. */
+  const tickProgress = Math.min(1, (now - g.lastTickAt) / Math.max(1, g.tickInterval));
   for (let i = g.snake.length - 1; i >= 0; i--) {
-    drawSnakeCell(ctx, g.snake[i], i, g.snake.length, g.value, offX, offY, cellSize);
+    const cur  = g.snake[i];
+    const prev = g.prevSnake[i] ?? cur;
+    const ix = prev.x + (cur.x - prev.x) * tickProgress;
+    const iy = prev.y + (cur.y - prev.y) * tickProgress;
+    drawSnakeCell(ctx, ix, iy, i, g.snake.length, g.value, offX, offY, cellSize, now);
   }
 
-  // Floating score popups
+  /* Particle bursts on top of the snake */
+  for (const p of g.particles) {
+    const a = Math.max(0, p.life / p.ttl);
+    const cx = offX + p.x * cellSize;
+    const cy = offY + p.y * cellSize;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle   = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur  = 8;
+    ctx.beginPath();
+    ctx.arc(cx, cy, p.size * a, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* Floating score popups */
   for (const f of g.floaters) {
     const a = Math.max(0, f.life / f.ttl);
     const cx = offX + f.x * cellSize + cellSize / 2;
@@ -545,14 +631,35 @@ function drawWorld(ctx: CanvasRenderingContext2D, g: any, _now: number) {
     ctx.save();
     ctx.globalAlpha    = a;
     ctx.fillStyle      = f.color;
-    ctx.font           = "bold 13px 'JetBrains Mono', monospace";
+    ctx.font           = "bold 14px 'JetBrains Mono', monospace";
     ctx.textAlign      = "center";
     ctx.textBaseline   = "middle";
+    ctx.shadowColor    = f.color;
+    ctx.shadowBlur     = 6;
     ctx.fillText(f.text, cx, cy);
     ctx.restore();
   }
 
-  // Damage / pickup flash overlay
+  /* Combo banner — big centred call-out when chaining gates */
+  if (g.bannerLife > 0) {
+    const t = g.bannerLife / 1.2;
+    const ease = 1 - (1 - t) * (1 - t);                 // ease-out alpha
+    const bigScale = 1 + (1 - t) * 0.7;                  // pop-in scale
+    ctx.save();
+    ctx.globalAlpha    = Math.min(1, ease * 1.4);
+    ctx.translate(cssW / 2, cssH / 2 - 30);
+    ctx.scale(bigScale, bigScale);
+    ctx.fillStyle      = "#fbbf24";
+    ctx.font           = "bold 36px 'JetBrains Mono', monospace";
+    ctx.textAlign      = "center";
+    ctx.textBaseline   = "middle";
+    ctx.shadowColor    = "#fbbf24";
+    ctx.shadowBlur     = 18;
+    ctx.fillText(`COMBO ×${g.bannerCombo}`, 0, 0);
+    ctx.restore();
+  }
+
+  /* Damage / pickup flash overlay */
   if (g.flash > 0) {
     const c = g.flashKind === "bad" ? "248,113,113" : "52,211,153";
     ctx.fillStyle = `rgba(${c},${g.flash * 0.18})`;
@@ -560,11 +667,11 @@ function drawWorld(ctx: CanvasRenderingContext2D, g: any, _now: number) {
   }
 }
 
-function drawSnakeCell(ctx: CanvasRenderingContext2D, c: Cell, idx: number, total: number, value: 0 | 1, offX: number, offY: number, size: number) {
-  const x = offX + c.x * size + 1;
-  const y = offY + c.y * size + 1;
+function drawSnakeCell(ctx: CanvasRenderingContext2D, fx: number, fy: number, idx: number, total: number, value: 0 | 1, offX: number, offY: number, size: number, now: number) {
+  const x = offX + fx * size + 1;
+  const y = offY + fy * size + 1;
   const w = size - 2;
-  const radius = Math.max(2, Math.floor(size * 0.25));
+  const radius = Math.max(2, Math.floor(size * 0.3));
 
   const isHead = idx === 0;
   // Body fades to dimmer at the tail so the player can read direction
@@ -574,14 +681,22 @@ function drawSnakeCell(ctx: CanvasRenderingContext2D, c: Cell, idx: number, tota
 
   ctx.save();
   ctx.globalAlpha = alpha;
-  // Halo on the head only
+
+  // Every segment gets a soft glow now (used to be head-only) — sells
+  // the "I am a luminous signal" identity even when fully extended.
+  ctx.shadowColor = baseColor;
+  ctx.shadowBlur  = isHead ? 18 : 6;
+
   if (isHead) {
+    // Pulsing halo on the head, breath-synced to wall clock for a
+    // subtle "this thing is alive" vibe.
+    const pulse = 0.85 + Math.sin(now * 0.008) * 0.15;
     ctx.fillStyle = baseColor;
-    ctx.globalAlpha = 0.35;
+    ctx.globalAlpha = 0.35 * pulse;
     ctx.beginPath();
-    ctx.roundRect(x - 3, y - 3, w + 6, w + 6, radius + 3);
+    ctx.roundRect(x - 4, y - 4, w + 8, w + 8, radius + 4);
     ctx.fill();
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = alpha;
   }
   ctx.fillStyle = baseColor;
   ctx.beginPath();
@@ -589,8 +704,9 @@ function drawSnakeCell(ctx: CanvasRenderingContext2D, c: Cell, idx: number, tota
   ctx.fill();
 
   if (isHead) {
+    ctx.shadowBlur  = 0;
     ctx.fillStyle    = "#0f1117";
-    ctx.font         = "bold 13px 'JetBrains Mono', monospace";
+    ctx.font         = `bold ${Math.max(11, Math.floor(size * 0.55))}px 'JetBrains Mono', monospace`;
     ctx.textAlign    = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(String(value), x + w / 2, y + w / 2 + 1);
@@ -598,21 +714,32 @@ function drawSnakeCell(ctx: CanvasRenderingContext2D, c: Cell, idx: number, tota
   ctx.restore();
 }
 
-function drawPickup(ctx: CanvasRenderingContext2D, p: Pickup, offX: number, offY: number, size: number) {
+function drawPickup(ctx: CanvasRenderingContext2D, p: Pickup, offX: number, offY: number, size: number, now: number) {
+  // Subtle vertical bob keyed off the cell so neighbouring pickups
+  // don't bob in lockstep. Makes the board feel alive without being
+  // distracting.
+  const phase = (p.cell.x + p.cell.y) * 0.7;
+  const bob   = Math.sin(now * 0.005 + phase) * 1.5;
   const cx = offX + p.cell.x * size + size / 2;
-  const cy = offY + p.cell.y * size + size / 2;
+  const cy = offY + p.cell.y * size + size / 2 + bob;
 
   if (p.kind === "bit") {
     const colour = p.value === 1 ? "#34d399" : "#60a5fa";
-    ctx.fillStyle = colour;
-    ctx.globalAlpha = 0.35;
+    // Outer pulsing halo
+    const pulse = 0.7 + Math.sin(now * 0.006 + phase) * 0.3;
+    ctx.save();
+    ctx.shadowColor = colour;
+    ctx.shadowBlur  = 12;
+    ctx.fillStyle   = colour;
+    ctx.globalAlpha = 0.3 * pulse;
     ctx.beginPath();
-    ctx.arc(cx, cy, size * 0.42, 0, Math.PI * 2);
+    ctx.arc(cx, cy, size * 0.45, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.beginPath();
-    ctx.arc(cx, cy, size * 0.28, 0, Math.PI * 2);
+    ctx.arc(cx, cy, size * 0.3, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
     ctx.fillStyle    = "#0f1117";
     ctx.font         = `bold ${Math.max(10, Math.floor(size * 0.5))}px 'JetBrains Mono', monospace`;
     ctx.textAlign    = "center";
@@ -622,14 +749,18 @@ function drawPickup(ctx: CanvasRenderingContext2D, p: Pickup, offX: number, offY
   }
   if (p.kind === "power") {
     const colour = p.effect === "vcc" ? "#34d399" : "#2dd4bf";
+    ctx.save();
+    ctx.shadowColor = colour;
+    ctx.shadowBlur  = 10;
     ctx.strokeStyle = colour;
-    ctx.lineWidth   = 2;
+    ctx.lineWidth   = 2.5;
     ctx.fillStyle   = "#161922";
     ctx.beginPath();
-    ctx.roundRect(cx - size * 0.38, cy - size * 0.38, size * 0.76, size * 0.76, 4);
+    ctx.roundRect(cx - size * 0.4, cy - size * 0.4, size * 0.8, size * 0.8, 5);
     ctx.fill(); ctx.stroke();
+    ctx.restore();
     ctx.fillStyle    = colour;
-    ctx.font         = `bold ${Math.max(8, Math.floor(size * 0.34))}px 'JetBrains Mono', monospace`;
+    ctx.font         = `bold ${Math.max(8, Math.floor(size * 0.38))}px 'JetBrains Mono', monospace`;
     ctx.textAlign    = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(p.effect === "vcc" ? "♥" : "⏱", cx, cy + 1);
@@ -638,14 +769,21 @@ function drawPickup(ctx: CanvasRenderingContext2D, p: Pickup, offX: number, offY
   // gate
   const wantHigh = p.needs === 1;
   const colour = wantHigh ? "#818cf8" : "#fbbf24";
+  // Gates pulse stronger than bits — they're the score multiplier so
+  // they should grab the eye more aggressively.
+  const pulse = 0.6 + Math.sin(now * 0.008 + phase) * 0.4;
+  ctx.save();
+  ctx.shadowColor = colour;
+  ctx.shadowBlur  = 10 + pulse * 6;
   ctx.strokeStyle = colour;
-  ctx.lineWidth   = 2;
+  ctx.lineWidth   = 2.5;
   ctx.fillStyle   = "#161922";
   ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.42, 0, Math.PI * 2);
+  ctx.arc(cx, cy, size * 0.44, 0, Math.PI * 2);
   ctx.fill(); ctx.stroke();
+  ctx.restore();
   ctx.fillStyle    = colour;
-  ctx.font         = `bold ${Math.max(7, Math.floor(size * 0.26))}px 'JetBrains Mono', monospace`;
+  ctx.font         = `bold ${Math.max(7, Math.floor(size * 0.28))}px 'JetBrains Mono', monospace`;
   ctx.textAlign    = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(p.gateKind, cx, cy - 2);

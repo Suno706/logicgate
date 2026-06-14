@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { collab, type PresenceUser } from "../collab";
-import { Users } from "lucide-react";
+import { Users, Loader2 } from "lucide-react";
 import { getRoomCode, isRoomOwner, kickFromRoom, fetchRoomInfo } from "../api";
+import { useToast } from "./Toast";
 
 /**
  * Shows a badge listing everyone in the current room (including yourself).
@@ -12,8 +13,27 @@ export function PresenceBadge() {
   const [users, setUsers] = useState<PresenceUser[]>([]);
   const [open,  setOpen]  = useState(false);
   const [serverIsOwner, setServerIsOwner] = useState<boolean | null>(null);
+  // sid -> 'pending' | 'kicked' lets the row render a spinner while the
+  // API is mid-flight, and an optimistic "Removed" state once it returns.
+  // Without this the host clicks Remove and the dropdown looks frozen
+  // until the next presence broadcast lands, which is what felt
+  // "half-cooked" to the user.
+  const [kickStatus, setKickStatus] = useState<Record<string, "pending" | "kicked">>({});
+  const toast = useToast();
 
-  useEffect(() => collab.onPresence(setUsers), []);
+  useEffect(() => collab.onPresence((next) => {
+    setUsers(next);
+    // Clean up kick status entries for sids that are no longer in the
+    // roster — they've actually left, so the "Removed" badge can go.
+    setKickStatus((cur) => {
+      const inRoom = new Set(next.map((u) => u.sid));
+      const out: Record<string, "pending" | "kicked"> = {};
+      for (const [sid, st] of Object.entries(cur)) {
+        if (inRoom.has(sid)) out[sid] = st;
+      }
+      return out;
+    });
+  }), []);
 
   const code = getRoomCode();
 
@@ -38,11 +58,34 @@ export function PresenceBadge() {
 
   async function handleKick(sid: string, name: string) {
     if (!code) return;
-    if (!confirm(`Remove ${name || "this user"} from room ${code}?`)) return;
+    // Guard against double-tap firing two requests
+    if (kickStatus[sid]) return;
+    // We keep a confirm() here because Remove is destructive and a custom
+    // modal would be heavier than this UX needs. If the design team
+    // later wants an inline toast-confirm pattern, swap here.
+    if (!confirm(`Remove ${name || "this user"} from room ${code}?\n\nThey'll be disconnected immediately and can't rejoin until you invite them back.`)) return;
+
+    setKickStatus((m) => ({ ...m, [sid]: "pending" }));
     try {
-      await kickFromRoom(code, sid);
+      const res = await kickFromRoom(code, sid);
+      if (res.success && res.kicked) {
+        toast.success(`${name || "User"} removed from room.`);
+        setKickStatus((m) => ({ ...m, [sid]: "kicked" }));
+      } else if (res.success && !res.kicked) {
+        // Server accepted the call but the target wasn't actually in the
+        // room socket — most often because they already left. Either
+        // way, the user is gone from the host's point of view.
+        toast.info(`${name || "User"} was no longer in the room.`);
+        setKickStatus((m) => ({ ...m, [sid]: "kicked" }));
+      }
     } catch (e) {
-      alert(`Kick failed: ${(e as Error).message}`);
+      const msg = (e as Error).message || "Kick failed";
+      toast.error(`Couldn't remove ${name || "user"}: ${msg}`);
+      setKickStatus((m) => {
+        const next = { ...m };
+        delete next[sid];
+        return next;
+      });
     }
   }
 
@@ -131,15 +174,32 @@ export function PresenceBadge() {
                 {(u.name || "?")[0].toUpperCase()}
               </div>
               <span className="flex-1 truncate text-[12px] text-gray-200">{u.name || "guest"}</span>
-              {isOwner && (
-                <button
-                  onClick={() => handleKick(u.sid, u.name)}
-                  className="px-2 py-0.5 rounded text-[10px] font-medium text-gray-500 hover:text-err hover:bg-err/10 border border-bg-600 hover:border-err/30 transition-colors flex-shrink-0"
-                  title="Remove this user from the room"
-                >
-                  Remove
-                </button>
-              )}
+              {isOwner && (() => {
+                const st = kickStatus[u.sid];
+                if (st === "pending") {
+                  return (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-medium text-gray-500 border border-bg-600 flex items-center gap-1 flex-shrink-0">
+                      <Loader2 size={11} className="animate-spin" /> Removing
+                    </span>
+                  );
+                }
+                if (st === "kicked") {
+                  return (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-medium text-gray-600 border border-bg-600 flex-shrink-0 italic">
+                      Removed
+                    </span>
+                  );
+                }
+                return (
+                  <button
+                    onClick={() => handleKick(u.sid, u.name)}
+                    className="px-2 py-0.5 rounded text-[10px] font-medium text-gray-500 hover:text-err hover:bg-err/10 border border-bg-600 hover:border-err/30 transition-colors flex-shrink-0"
+                    title="Remove this user from the room — they'll be disconnected and banned until you invite them back"
+                  >
+                    Remove
+                  </button>
+                );
+              })()}
             </div>
           ))}
           {peers.length === 0 && users.length > 0 && (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   MousePointer2, Spline, Hand, Undo2, Redo2, Trash2, Square,
   Grid3x3, Play, StopCircle, Save, FolderOpen, Wifi, WifiOff,
@@ -127,6 +127,10 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
   const [showRoom,   setShowRoom]   = useState(false);
   const [roomInput,  setRoomInput]  = useState("");
   const [currentRoom, setCurrentRoom] = useState<string | null>(getRoomCode());
+
+  // Ref attached to the horizontally-scrollable toolbar wrapper so the
+  // wheel handler can mutate scrollLeft directly without a re-render.
+  const toolbarScrollRef = useRef<HTMLDivElement | null>(null);
 
   const { circuit, selected, history, future } = state;
   const canUndo = history.length > 0;
@@ -267,10 +271,34 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
         {/* SCROLLABLE TOOLBAR — every editor action stays one tap away.
             Wrapped in its own scroll container so the right-side cluster
             (presence dropdown, status, theme, user chip) doesn't get
-            clipped when popups open downward. */}
+            clipped when popups open downward.
+
+            Refinements based on user feedback:
+              - Scrollbar visually hidden (it clutters a 48px bar) but
+                we paint a small fade gradient on the right edge to
+                signal that more content lives off-screen.
+              - Mouse wheel rotates horizontally over the toolbar; users
+                shouldn't have to remember Shift+wheel. */}
         <div
+          ref={toolbarScrollRef}
           className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto overflow-y-visible -my-px py-px [&::-webkit-scrollbar]:hidden"
-          style={{ scrollbarWidth: "none" }}
+          style={{
+            scrollbarWidth: "none",
+            // Soft right-edge fade so the toolbar reads as 'continues
+            // off-screen' rather than 'this is the end of the actions'.
+            // mask-image renders independently of theme so it works
+            // identically in dark and light modes.
+            maskImage:        "linear-gradient(to right, black calc(100% - 36px), transparent)",
+            WebkitMaskImage:  "linear-gradient(to right, black calc(100% - 36px), transparent)",
+          }}
+          onWheel={(e) => {
+            // Convert vertical wheel into horizontal scroll. Touch-pad
+            // horizontal swipes already work; this catches mouse users.
+            const el = e.currentTarget;
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+              el.scrollLeft += e.deltaY;
+            }
+          }}
         >
 
         {/* Logo — clickable wordmark on the left */}

@@ -77,6 +77,23 @@ html.light {
   ::-webkit-scrollbar-track { background: var(--lg-scroll-track); }
   ::-webkit-scrollbar-thumb { background: var(--lg-scroll-thumb); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--lg-scroll-thumb-hover); }
+
+  /* Top-bar scrollable toolbar: keep a thin BUT VISIBLE horizontal
+     scrollbar so users can tell at a glance that more buttons exist
+     off-screen. Previous attempts hid the scrollbar entirely (with
+     just a mask gradient hint) and the user couldn't tell scrolling
+     was even possible. Vertical scrollbar is suppressed so it never
+     appears inside the 48px bar. */
+  .toolbar-scroll {
+    scrollbar-width: thin;                              /* Firefox */
+    scrollbar-color: var(--lg-scroll-thumb-hover) transparent;
+  }
+  .toolbar-scroll::-webkit-scrollbar         { height: 4px; }
+  .toolbar-scroll::-webkit-scrollbar-track   { background: transparent; }
+  .toolbar-scroll::-webkit-scrollbar-thumb   { background: var(--lg-scroll-thumb-hover); border-radius: 2px; }
+  .toolbar-scroll::-webkit-scrollbar-thumb:hover { background: var(--lg-accent); }
+  /* No vertical scrollbar on the toolbar — explicitly requested. */
+  .toolbar-scroll::-webkit-scrollbar:vertical { display: none; }
 }
 
 @layer components {

@@ -281,16 +281,7 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
                 shouldn't have to remember Shift+wheel. */}
         <div
           ref={toolbarScrollRef}
-          className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto overflow-y-visible -my-px py-px [&::-webkit-scrollbar]:hidden"
-          style={{
-            scrollbarWidth: "none",
-            // Soft right-edge fade so the toolbar reads as 'continues
-            // off-screen' rather than 'this is the end of the actions'.
-            // mask-image renders independently of theme so it works
-            // identically in dark and light modes.
-            maskImage:        "linear-gradient(to right, black calc(100% - 36px), transparent)",
-            WebkitMaskImage:  "linear-gradient(to right, black calc(100% - 36px), transparent)",
-          }}
+          className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto overflow-y-visible toolbar-scroll"
           onWheel={(e) => {
             // Convert vertical wheel into horizontal scroll. Touch-pad
             // horizontal swipes already work; this catches mouse users.
@@ -515,9 +506,14 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
 
       {/* ── Room / collaboration modal ── */}
       {showRoom && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => setShowRoom(false)}>
-          <div className="bg-bg-800 border border-bg-600 rounded-xl p-5 w-96 space-y-4 shadow-2xl"
+          {/* max-h + overflow-y-auto: on phones the content (intro,
+              create button, join input, recent rooms) was taller than
+              the viewport, hiding the Create-Room button below the
+              fold with no way to scroll to it. User reported the
+              create option as "missing". */}
+          <div className="bg-bg-800 border border-bg-600 rounded-xl p-5 w-96 max-w-full max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

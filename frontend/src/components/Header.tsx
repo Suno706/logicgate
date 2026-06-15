@@ -11,7 +11,7 @@ import { simulate, saveCircuit, listAllCircuits, loadCircuit,
          getSessionId, setRoom, getRoomCode, markRoomOwned,
          isRoomOwner, saveOwnerToken, getOwnerToken,
          kickFromRoom } from "../api";
-import { collab } from "../collab";
+import { collab, type PresenceUser } from "../collab";
 import { getDisplayName, signOut } from "./SignInGate";
 import { PresenceBadge } from "./PresenceBadge";
 import { useToast } from "./Toast";
@@ -714,11 +714,13 @@ function CurrentRoomBlock(
 /** Inline member list shown inside the Room dialog when the caller is the
  * host. Each peer has a big visible Kick button. */
 function MembersList({ currentRoom }: { currentRoom: string }) {
-  const [users, setUsers] = useState<{ sid: string; name: string; color: string }[]>([]);
+  // Roster type matches collab.PresenceUser exactly; using the existing
+  // type instead of an inline literal lets us drop the `as any` cast.
+  const [users, setUsers] = useState<PresenceUser[]>([]);
   const [kickingSid, setKickingSid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => collab.onPresence(setUsers as any), []);
+  useEffect(() => collab.onPresence(setUsers), []);
 
   const ownSid = collab.ownSid();
   const peers  = users.filter((u) => u.sid !== ownSid);

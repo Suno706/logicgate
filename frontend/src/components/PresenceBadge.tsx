@@ -19,6 +19,12 @@ export function PresenceBadge() {
   // until the next presence broadcast lands, which is what felt
   // "half-cooked" to the user.
   const [kickStatus, setKickStatus] = useState<Record<string, "pending" | "kicked">>({});
+  // The dropdown uses position:fixed (not absolute) so it escapes the
+  // top bar's horizontal-scroll overflow. We capture the badge's
+  // bounding rect when the user opens the dropdown and pin it via
+  // inline top/right styles. Declared up here with the other hooks so
+  // it runs in a stable order even on renders that early-return below.
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
   const toast = useToast();
 
   useEffect(() => collab.onPresence((next) => {
@@ -92,10 +98,6 @@ export function PresenceBadge() {
   // Choose label color: green when 2+ are present (live), gray when alone.
   const live = total >= 2;
 
-  // The dropdown uses position:fixed (not absolute) so it escapes the
-  // top bar's horizontal-scroll overflow. Read the badge's bounding
-  // rect at open time and pin the dropdown below it.
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
   function toggleDropdown(e: React.MouseEvent<HTMLButtonElement>) {
     if (open) { setOpen(false); return; }
     const r = e.currentTarget.getBoundingClientRect();

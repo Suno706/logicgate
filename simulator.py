@@ -1,38 +1,89 @@
-# simulator.py
+"""
+simulator.py — single-pass evaluator for a combinational/sequential
+gate-level circuit.
+
+The simulator treats a circuit as a directed graph of gates connected
+by wires. Evaluation is one pass in topological order:
+
+    1. Validate inputs and detect feedback loops.
+    2. Compute a valid evaluation order via Kahn's algorithm. Gates with
+       no incoming wires (INPUT, CLOCK, VCC, GND) come first; downstream
+       gates fall in dependency order.
+    3. Walk the order, reading each gate's input pins from the
+       already-computed upstream values and writing the gate's output.
+
+Why one-shot, not iterative-until-stable?
+    For purely combinational circuits, one topological pass is exact.
+    For sequential elements (D-/JK-/T-FF, SR latch, REG4), this engine
+    evaluates the "next state" once — Q reflects the inputs as if the
+    clock just ticked. That keeps the simulator cheap and predictable;
+    a multi-cycle simulator would need a separate engine.
+
+Wire schema flexibility:
+    Wires accept both 'from_gate'/'to_gate'/'from_pin'/'to_pin' (verbose,
+    used by the backend) and 'fg'/'tg'/'fp'/'tp' (shorthand, used in
+    some JSON dumps). Helper readers normalise this so callers don't
+    care which form they emit.
+
+Multi-output gate convention:
+    A macro gate G with multiple outputs writes its primary output
+    under the key  values[G]  and each additional pin under the key
+      values["G:1"], values["G:2"], …
+    Wires that target pin > 0 of G resolve to the corresponding "G:p"
+    entry. This matches the multi-pin convention used elsewhere in the
+    project (api.ts, boolean_synth.py).
+"""
+
 from collections import defaultdict, deque
+
+
+def _wire_endpoints(wire):
+    """Extract (src_gate_id, dst_gate_id) from a wire dict, accepting
+    either the verbose ('from_gate'/'to_gate') or shorthand ('fg'/'tg')
+    schema. Returns (None, None) for malformed wires so callers can skip
+    them without raising."""
+    src = wire.get("from_gate") or wire.get("fg")
+    dst = wire.get("to_gate")   or wire.get("tg")
+    return src, dst
 
 
 def detect_cycles(gates, wires):
     """
-    Detects cycles in the circuit graph.
-    Returns (has_cycle: bool, nodes_in_cycles: list)
-    """
-    gate_ids = {g["id"] for g in gates}
-    in_degree = {g["id"]: 0 for g in gates}
-    dependents = defaultdict(list)
+    Identify any gate that's part of a feedback loop.
 
-    for w in wires:
-        src = w.get("from_gate") or w.get("fg")
-        dst = w.get("to_gate") or w.get("tg")
+    Returns (has_cycle: bool, gates_in_cycle: list).
+
+    Algorithm: try Kahn's topological sort. Gates that can't be reached
+    from any source (i.e. their in-degree never falls to zero) must be
+    part of a cycle. This is the same primitive used by
+    `topological_sort` below; we keep them as separate functions because
+    callers like the fault detector want only the cycle membership,
+    not the evaluation order.
+    """
+    gate_ids       = {g["id"] for g in gates}
+    in_degree      = {gid: 0 for gid in gate_ids}
+    downstream_of  = defaultdict(list)   # src_gate_id -> [dst_gate_id, ...]
+
+    for wire in wires:
+        src, dst = _wire_endpoints(wire)
         if src in gate_ids and dst in gate_ids:
-            dependents[src].append(dst)
+            downstream_of[src].append(dst)
             in_degree[dst] += 1
 
-    # Try topological sort
-    queue = deque([gid for gid, deg in in_degree.items() if deg == 0])
-    processed = set()
+    # Kahn's: peel off zero-in-degree nodes, then their successors, etc.
+    ready    = deque([gid for gid, deg in in_degree.items() if deg == 0])
+    settled  = set()
+    while ready:
+        gate_id = ready.popleft()
+        settled.add(gate_id)
+        for dst in downstream_of[gate_id]:
+            in_degree[dst] -= 1
+            if in_degree[dst] == 0:
+                ready.append(dst)
 
-    while queue:
-        cur = queue.popleft()
-        processed.add(cur)
-        for nb in dependents[cur]:
-            in_degree[nb] -= 1
-            if in_degree[nb] == 0:
-                queue.append(nb)
-
-    # Any unprocessed nodes are in a cycle
-    cyclic_nodes = [gid for gid in gate_ids if gid not in processed]
-    return len(cyclic_nodes) > 0, cyclic_nodes
+    # Whatever didn't settle is reachable only through a cycle.
+    gates_in_cycle = [gid for gid in gate_ids if gid not in settled]
+    return len(gates_in_cycle) > 0, gates_in_cycle
 
 
 def validate_circuit(gates, wires):
@@ -223,158 +274,210 @@ def evaluate_macro_pins(t, inputs):
 
 def topological_sort(gates, wires):
     """
-    Kahn's algorithm topological sort.
-    Returns a valid evaluation order.
-    Detects and reports cycles (feedback loops).
+    Produce a valid evaluation order via Kahn's algorithm.
+
+    Gates with no incoming wires (sources: INPUT, CLOCK, VCC, GND)
+    appear first; downstream gates follow once all their drivers have
+    been emitted. Cycles are surfaced via a print() warning so the
+    caller's logs explain why some gates will hold 0 in the result.
+
+    Returns a list of gate ids in evaluation order. If the circuit has
+    cycles, only the acyclic portion is returned — `simulate_circuit`
+    pre-fills the dict with zeros so cyclic gates still read safely.
     """
-    gate_ids   = {g["id"] for g in gates}
-    in_degree  = {g["id"]: 0 for g in gates}
-    dependents = defaultdict(list)   # src_id -> [dst_id, ...]
+    gate_ids       = {g["id"] for g in gates}
+    in_degree      = {gid: 0 for gid in gate_ids}
+    downstream_of  = defaultdict(list)   # src_gate_id -> [dst_gate_id, ...]
 
-    for w in wires:
-        # Support both 'from_gate'/'to_gate' (backend) and 'fg'/'tg' (frontend shorthand)
-        src = w.get("from_gate") or w.get("fg")
-        dst = w.get("to_gate")   or w.get("tg")
-
+    for wire in wires:
+        src, dst = _wire_endpoints(wire)
         if src in gate_ids and dst in gate_ids:
-            dependents[src].append(dst)
+            downstream_of[src].append(dst)
             in_degree[dst] += 1
 
-    # Start with all source nodes (no incoming edges)
-    queue = deque([gid for gid, deg in in_degree.items() if deg == 0])
-    order = []
+    ready             = deque([gid for gid, deg in in_degree.items() if deg == 0])
+    evaluation_order  = []
 
-    while queue:
-        cur = queue.popleft()
-        order.append(cur)
-        for nb in dependents[cur]:
-            in_degree[nb] -= 1
-            if in_degree[nb] == 0:
-                queue.append(nb)
+    while ready:
+        gate_id = ready.popleft()
+        evaluation_order.append(gate_id)
+        for dst in downstream_of[gate_id]:
+            in_degree[dst] -= 1
+            if in_degree[dst] == 0:
+                ready.append(dst)
 
-    # -- Cycle detection ------------------------------------------------------
-    if len(order) < len(gate_ids):
-        cyclic_ids = [gid for gid in gate_ids if gid not in set(order)]
+    # Cycle report — surfaced as a warning rather than an exception so
+    # the rest of the circuit still evaluates. Cyclic gates default to
+    # zero in `simulate_circuit` via its pre-fill pass.
+    if len(evaluation_order) < len(gate_ids):
+        cyclic_ids = [gid for gid in gate_ids if gid not in set(evaluation_order)]
         print(
             f"Warning: cycle detected in circuit. "
             f"The following gates are part of a feedback loop and will hold 0: "
             f"{cyclic_ids}"
         )
 
-    return order
+    return evaluation_order
+
+
+# Expected number of input pins per gate type. Lookup table kept at
+# module scope so we don't rebuild it on every simulate_circuit call.
+# Composite + sequential entries are accepted here even though their
+# *evaluation* lives in evaluate_macro_pins — keeping the count co-located
+# with the primitives means there's one place to check when adding a
+# new gate.
+_PINS_PER_GATE = {
+    # Sources — no inputs.
+    "INPUT":  0,
+    "CLOCK":  0,
+    "VCC":    0,
+    "GND":    0,
+    # Single-input sinks and inverters.
+    "LED":    1,
+    "NOT":    1,
+    "BUS":    1,
+    "OUTPUT": 1,
+    # Standard combinational gates.
+    "AND":    2,
+    "OR":     2,
+    "NAND":   2,
+    "NOR":    2,
+    "XOR":    2,
+    "XNOR":   2,
+    # Composite combinational macros.
+    "HA":     2,   # half adder            (A, B)
+    "FA":     3,   # full adder            (A, B, Cin)
+    "MUX2":   3,   # 2-to-1 mux            (A, B, S)
+    "MUX4":   6,   # 4-to-1 mux            (D0..D3, S0, S1)
+    "DEC24":  2,   # 2-to-4 decoder        (S0, S1)
+    "DEC38":  3,   # 3-to-8 decoder        (S0..S2)
+    "ENC42":  4,   # 4-to-2 encoder        (D0..D3)
+    "CMP2":   4,   # 2-bit comparator      (A1, A0, B1, B0)
+    "ADD4":   9,   # 4-bit adder           (A0..A3, B0..B3, Cin)
+    # Sequential elements — evaluated combinationally, see module docstring.
+    "DFF":    2,   # D flip-flop           (D, CLK)
+    "TFF":    2,   # T flip-flop           (T, CLK)
+    "JKFF":   3,   # JK flip-flop          (J, K, CLK)
+    "REG4":   5,   # 4-bit register        (D0..D3, CLK)
+    "SRLATCH":2,   # SR latch              (S, R)
+}
+
+# Gates whose evaluation returns more than one output pin and must be
+# routed through evaluate_macro_pins.
+_MACRO_GATES = frozenset((
+    "HA", "FA", "DFF", "JKFF", "TFF", "SRLATCH",
+    "MUX2", "MUX4", "DEC24", "DEC38", "ENC42", "CMP2", "REG4",
+))
 
 
 def simulate_circuit(gates, wires):
     """
-    Simulate the full circuit and return a dict of {gate_id: output_value}.
+    Evaluate a complete circuit in one pass and return the output values.
 
-    Handles:
-      - INPUT and CLOCK gates (read their 'value' field)
-      - Standard logic gates: NOT, AND, OR, NAND, NOR, XOR, XNOR
-      - Pass-through gates: OUTPUT, BUS
-      - Unconnected input pins (default to 0)
-      - Multiple wires targeting the same pin (warns, uses last writer)
-      - Cyclic circuits (warns, affected gates hold 0)
-      - Unknown gate types (warns, output 0)
+    Args:
+        gates: list of gate dicts. Each gate has 'id', 'type', and for
+               sources an integer 'value' field that's already been set
+               by the caller (the UI, the truth-table runner, etc).
+        wires: list of wire dicts mapping (src_gate, src_pin) ->
+               (dst_gate, dst_pin). Both verbose and shorthand schemas
+               are accepted (see module docstring).
+
+    Returns:
+        A dict keyed by gate id (and "id:pin" for multi-output macros).
+        Every gate appears in the result — gates we never reached and
+        gates inside a feedback loop both default to 0, so callers can
+        always read a value without a KeyError check.
+
+    Behaviour notes:
+      * Multiple wires landing on the same input pin: a warning is
+        printed and the last-arriving writer wins. The caller would
+        normally have caught this in fault analysis, but we don't make
+        it fatal — the simulator's job is to produce numbers, not
+        enforce design rules.
+      * Unknown gate types: handled by inferring pin count from the
+        wires actually present, then printing a warning and returning 0.
+        This keeps the engine forward-compatible with new macro types
+        the boolean synthesiser might add without breaking immediately.
     """
-
     gate_map = {g["id"]: g for g in gates}
 
-    # input_map[gate_id][pin_index] = source_gate_id
-    input_map = defaultdict(dict)
+    # drivers[dst_gate_id][input_pin] = (src_gate_id, src_output_pin)
+    # We resolve to per-pin keys (id:pin) at read time so multi-output
+    # macros routed to different downstream pins still work.
+    drivers = defaultdict(dict)
 
-    for w in wires:
-        src      = w.get("from_gate") or w.get("fg")
-        dst      = w.get("to_gate")   or w.get("tg")
-        pin_raw  = w.get("to_pin")    if "to_pin"   in w else w.get("tp")
-        fpin_raw = w.get("from_pin")  if "from_pin" in w else w.get("fp")
+    for wire in wires:
+        src, dst = _wire_endpoints(wire)
+        dst_pin_raw = wire.get("to_pin",   wire.get("tp"))
+        src_pin_raw = wire.get("from_pin", wire.get("fp"))
 
-        if pin_raw is None:  pin_raw = 0
-        if fpin_raw is None: fpin_raw = 0
-        try:    pin_idx  = int(pin_raw)
-        except (ValueError, TypeError): pin_idx  = 0
-        try:    from_pin = int(fpin_raw)
-        except (ValueError, TypeError): from_pin = 0
+        # Defensive int-coercion. Wires can come from third-party callers
+        # (tests, NL-built circuits) that occasionally pass strings.
+        try:    dst_pin = int(dst_pin_raw) if dst_pin_raw is not None else 0
+        except (ValueError, TypeError): dst_pin = 0
+        try:    src_pin = int(src_pin_raw) if src_pin_raw is not None else 0
+        except (ValueError, TypeError): src_pin = 0
 
         if src and dst:
-            if pin_idx in input_map[dst]:
+            if dst_pin in drivers[dst]:
                 print(
-                    f"Warning: pin {pin_idx} of gate '{dst}' already has a driver "
-                    f"('{input_map[dst][pin_idx]}'). Overwriting with '{src}'."
+                    f"Warning: pin {dst_pin} of gate '{dst}' already has a driver "
+                    f"('{drivers[dst][dst_pin]}'). Overwriting with '{src}'."
                 )
-            # Store (src_id, from_pin) so multi-output gates route correctly
-            input_map[dst][pin_idx] = (src, from_pin)
+            drivers[dst][dst_pin] = (src, src_pin)
 
-    order = topological_sort(gates, wires)
+    evaluation_order = topological_sort(gates, wires)
 
-    # Pre-populate all gates with 0 so unvisited / cyclic gates are safe to read
+    # Pre-fill so unvisited / cyclic gates are safe to read as 0.
     values = {g["id"]: 0 for g in gates}
 
-    # Expected number of input pins per gate type
-    # -- Bug 1 fix: CLOCK added alongside INPUT -------------------------------
-    gate_input_counts = {
-        "INPUT":  0,
-        "CLOCK":  0,
-        "VCC":    0, "GND":    0,
-        "LED":    1,
-        "NOT":    1,
-        "BUS":    1,
-        "OUTPUT": 1,
-        "AND":    2,
-        "OR":     2,
-        "NAND":   2,
-        "NOR":    2,
-        "XOR":    2,
-        "XNOR":   2,
-        # composite + sequential  -  accepted here but evaluated client-side
-        "HA":     2, "FA":   3, "MUX4":  6, "DEC24": 2, "ADD4": 9,
-        "DFF":    2, "TFF":  2, "JKFF":  3, "REG4":  5,
-        "SRLATCH":2,
-        "MUX2":   3, "DEC38": 3, "ENC42": 4, "CMP2":  4,
-    }
+    def read_pin(dst_pins, pin):
+        """Read input `pin` of the current gate, resolving src multi-output."""
+        entry = dst_pins.get(pin)
+        if entry is None:
+            return 0
+        src_id, src_pin = entry
+        # Multi-output macros write per-pin values under "id:pin"; fall
+        # back to the primary "id" key for single-output gates.
+        v = values.get(f"{src_id}:{src_pin}")
+        if v is None:
+            v = values.get(src_id, 0)
+        # Strict binary normalisation. Eliminates 0/1 drift if any caller
+        # stashed a non-binary value (e.g. None) for an unconnected source.
+        return 1 if v else 0
 
-    for gid in order:
-        gate = gate_map.get(gid)
+    for gate_id in evaluation_order:
+        gate = gate_map.get(gate_id)
         if not gate:
             continue
 
-        t = gate["type"].upper()
+        gate_type = gate["type"].upper()
 
-        # -- Bug 1 fix: CLOCK handled exactly like INPUT ----------------------
-        if t in ("INPUT", "CLOCK"):
-            values[gid] = 1 if int(gate.get("value", 0)) else 0
+        # Sources read their pre-set 'value' field directly. CLOCK is
+        # treated identically to INPUT here; the difference only matters
+        # to fault analysis and the UI presentation layer.
+        if gate_type in ("INPUT", "CLOCK"):
+            values[gate_id] = 1 if int(gate.get("value", 0)) else 0
             continue
 
-        pins = input_map.get(gid, {})
+        dst_pins = drivers.get(gate_id, {})
 
-        # For known types use the fixed count; for unknown types infer from
-        # actually connected pins (avoids crashes on custom / future gate types)
-        if t in gate_input_counts:
-            num_inputs = gate_input_counts[t]
+        # Known type → use the declared pin count. Unknown type → infer
+        # from whatever wires are actually attached so future macros
+        # don't crash the simulator before they're added to the table.
+        if gate_type in _PINS_PER_GATE:
+            num_inputs = _PINS_PER_GATE[gate_type]
         else:
-            num_inputs = (max(pins.keys()) + 1) if pins else 0
+            num_inputs = (max(dst_pins.keys()) + 1) if dst_pins else 0
 
-        # -- Bug 3 fix: normalize inputs to strict binary ---------------------
-        def _read(p):
-            entry = pins.get(p)
-            if entry is None:
-                return 0
-            src_id, src_pin = entry
-            # Multi-output gates store per-pin values under "id:pin"; fall back
-            # to the primary "id" key for single-output gates.
-            v = values.get(f"{src_id}:{src_pin}")
-            if v is None:
-                v = values.get(src_id, 0)
-            return 1 if v else 0
-        inputs = [_read(p) for p in range(num_inputs)]
+        inputs = [read_pin(dst_pins, p) for p in range(num_inputs)]
 
-        if t in ("HA", "FA", "DFF", "JKFF", "TFF", "SRLATCH",
-                 "MUX2", "MUX4", "DEC24", "DEC38", "ENC42", "CMP2", "REG4"):
-            pins = evaluate_macro_pins(t, inputs)
-            values[gid] = pins[0]
-            for pi, pv in enumerate(pins):
-                values[f"{gid}:{pi}"] = pv
+        if gate_type in _MACRO_GATES:
+            macro_outputs = evaluate_macro_pins(gate_type, inputs)
+            values[gate_id] = macro_outputs[0]
+            for pin_index, pin_value in enumerate(macro_outputs):
+                values[f"{gate_id}:{pin_index}"] = pin_value
         else:
-            values[gid] = evaluate_gate(t, inputs)
+            values[gate_id] = evaluate_gate(gate_type, inputs)
 
     return values

@@ -3,6 +3,7 @@ import {
   MousePointer2, Spline, Hand, Undo2, Redo2, Trash2, Square,
   Grid3x3, Play, StopCircle, Save, FolderOpen, Wifi, WifiOff,
   Loader2, X, Maximize2, Users, BookOpen, Sun, Moon, LogIn, Gamepad2,
+  FileCode2,
 } from "lucide-react";
 import { getTheme, toggleTheme } from "../theme";
 import type { Tool } from "../types";
@@ -10,7 +11,7 @@ import { useCircuitState, useCircuitDispatch, useCircuitActions } from "../store
 import { simulate, saveCircuit, listAllCircuits, loadCircuit,
          getSessionId, setRoom, getRoomCode, markRoomOwned,
          isRoomOwner, saveOwnerToken, getOwnerToken,
-         kickFromRoom } from "../api";
+         kickFromRoom, exportVerilog } from "../api";
 import { collab, type PresenceUser } from "../collab";
 import { getDisplayName, signOut } from "./SignInGate";
 import { PresenceBadge } from "./PresenceBadge";
@@ -181,6 +182,32 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
     }
   }
 
+  async function doExportVerilog() {
+    if (!circuit.gates.length) {
+      toast.error("Nothing to export — add some gates first");
+      return;
+    }
+    try {
+      const moduleName = (saveName || "logicgate_circuit")
+        .trim()
+        .replace(/[^a-zA-Z0-9_]/g, "_") || "logicgate_circuit";
+      const r = await exportVerilog(circuit, moduleName);
+      const blob = new Blob([r.verilog], { type: "text/plain" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url;
+      a.download = `${r.module}.v`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${r.summary.gate_count} gates → ${r.module}.v`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Export failed";
+      toast.error(`Verilog export failed: ${msg}`);
+    }
+  }
+
   async function openLoad() {
     try {
       setCircuits(await listAllCircuits());
@@ -345,6 +372,10 @@ export function Header({ tool, setTool, snapGrid, setSnapGrid, backendOk, onCirc
           <Divider />
           <ToolBtn icon={<Save size={13} />}       label="Save"     title="Save circuit to YOUR session" onClick={() => setShowSave(true)} />
           <ToolBtn icon={<FolderOpen size={13} />} label="Load"     title="Load saved or example circuit" onClick={openLoad} />
+          <ToolBtn icon={<FileCode2 size={13} />}  label="Verilog"
+            title="Export the current circuit as a synthesizable Verilog module (.v)"
+            disabled={circuit.gates.length === 0}
+            onClick={doExportVerilog} />
           <ToolBtn icon={<Users size={13} />}      label={currentRoom ? `Room: ${currentRoom}` : "Solo"}
             title="Join a shared room — everyone in the same room sees the same saved circuits"
             variant={currentRoom ? "primary" : "default"}

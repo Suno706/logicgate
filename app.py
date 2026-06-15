@@ -47,6 +47,8 @@ from ml_models.boolean_synth        import (
 )
 from ml_models.connection_suggester import ConnectionSuggester
 from ml_models.topology_classifier  import TopologyClassifier
+from ml_models.verilog_export       import export_verilog, export_summary, VerilogExportError
+from rate_limit                     import limit, require_session
 
 # Serve the Vite/React build from frontend/dist.
 _DIST = os.path.join(os.path.dirname(__file__), 'frontend', 'dist')
@@ -250,6 +252,8 @@ def simulate():
 # -- Save / Load / List (frontend-facing, plain paths) --------------------------
 
 @app.route('/save', methods=['POST'])
+@limit("save", per_minute=20)
+@require_session
 def save_short():
     try:
         data  = request.get_json(silent=True) or {}
@@ -304,6 +308,7 @@ def list_short():
 # ─── Room creation / lookup ─────────────────────────────────────────────────
 
 @app.route('/api/rooms/new', methods=['POST'])
+@limit("room_create", per_minute=6)
 def room_new():
     """Auto-generate a 6-character room code and an owner_token. The token is
     returned ONCE and the client must store it to be recognized as host on
@@ -616,6 +621,7 @@ def analyze_minimize():
 # -- Question Solver -----------------------------------------------------------
 
 @app.route('/api/ask', methods=['POST'])
+@limit("ask", per_minute=40)
 def ask_question():
     if (r := _ml_guard()): return r
     try:
@@ -759,6 +765,7 @@ def learning_stats():
 
 
 @app.route('/api/learning/retrain', methods=['POST'])
+@limit("retrain", per_minute=2)
 def trigger_retrain():
     """
     Merges user-query log into intent training data and retrains the
@@ -858,6 +865,7 @@ def analyze_full():
 # -- Boolean -> Gate JSON -------------------------------------------------------
 
 @app.route('/api/build/boolean', methods=['POST'])
+@limit("build", per_minute=30)
 def build_boolean():
     """
     Body: {expression: 'A & B | ~C', target_gates?: ['NAND'], name?: 'expr'}
@@ -886,6 +894,7 @@ def build_boolean():
 # -- Question -> Circuit --------------------------------------------------------
 
 @app.route('/api/build/question', methods=['POST'])
+@limit("build", per_minute=30)
 def build_question():
     """
     Body: {question: 'build a half adder' / 'A xor B' / 'XOR using NAND'}
@@ -907,6 +916,7 @@ def build_question():
 # -- Synthesise with a restricted gate set -------------------------------------
 
 @app.route('/api/synthesize', methods=['POST'])
+@limit("build", per_minute=30)
 def synthesize():
     """
     Body: {expression: '...', allowed_gates: ['NAND'] | ['NOR'] | ['AND','OR','NOT']}
@@ -961,9 +971,42 @@ def suggest_connection():
         return _err(e, exc=e)
 
 
+# -- Verilog export ------------------------------------------------------------
+
+@app.route('/api/export/verilog', methods=['POST'])
+@limit("export", per_minute=15)
+def export_circuit_verilog():
+    """
+    Body: {"circuit": {"gates":[...], "wires":[...]}, "module_name"?: "my_adder"}
+    Returns: {"status": "success", "verilog": "<source>", "summary": {...}}
+    No ML required — runs even while models are warming up.
+    """
+    try:
+        data    = request.get_json(silent=True) or {}
+        circuit = data.get('circuit') or {}
+        module  = (data.get('module_name') or 'logicgate_circuit').strip()
+        if not circuit.get('gates'):
+            return _err('Circuit has no gates to export', 400)
+        src = export_verilog(circuit, module_name=module)
+        return jsonify({
+            'status':   'success',
+            'success':  True,
+            'verilog':  src,
+            'summary':  export_summary(circuit),
+            'module':   module,
+            'timestamp': datetime.now().isoformat(),
+        })
+    except VerilogExportError as e:
+        return _err(str(e), 400)
+    except Exception as e:
+        return _err(e, exc=e)
+
+
 # -- Legacy /api save/load/list/delete (kept for compatibility) ----------------
 
 @app.route('/api/save', methods=['POST'])
+@limit("save", per_minute=20)
+@require_session
 def save_circuit():
     try:
         data = request.get_json(silent=True) or {}
@@ -1014,6 +1057,8 @@ def list_circuits():
 
 
 @app.route('/api/delete/<name>', methods=['DELETE'])
+@limit("save", per_minute=20)
+@require_session
 def delete_circuit(name):
     try:
         name = _safe_name(name)

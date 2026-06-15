@@ -338,6 +338,27 @@ export async function listAllCircuits() {
   return { mine: res.mine ?? [], examples: res.examples ?? [] };
 }
 
+export interface VerilogExportResponse {
+  status: string;
+  success: boolean;
+  verilog: string;
+  module: string;
+  summary: {
+    gate_count: number;
+    wire_count: number;
+    by_type: Record<string, number>;
+    has_clock: boolean;
+    sequential: boolean;
+  };
+}
+
+export function exportVerilog(circuit: Circuit, moduleName?: string) {
+  return postJSON<VerilogExportResponse>("/api/export/verilog", {
+    circuit,
+    module_name: moduleName,
+  });
+}
+
 export function deleteCircuit(name: string) {
   return fetch(`/api/delete/${encodeURIComponent(name)}`, { method: "DELETE" }).then(
     (r) => r.json(),

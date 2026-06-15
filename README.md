@@ -11,11 +11,16 @@ license: mit
 
 # LogicGate — Browser-based Digital Logic Designer
 
+**[▶ Try the live demo](https://huggingface.co/spaces/sunooooooo/logicgate)** · [Source](https://github.com/Suno706/logicgate) · [Architecture](ARCHITECTURE.md) · [Model card](docs/model_cards/topology_classifier.md)
+
 [![CI](https://github.com/Suno706/logicgate/actions/workflows/ci.yml/badge.svg)](https://github.com/Suno706/logicgate/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/flask-3.x-green.svg)](https://flask.palletsprojects.com/)
 [![React 18](https://img.shields.io/badge/react-18-blue.svg)](https://react.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+<!-- TODO: drop a ~15s screen-capture of the canvas → truth-table → Verilog flow here. -->
+<!-- ![demo](docs/demo.gif) -->
 
 > A web circuit editor with **Quine-McCluskey boolean synthesis**, real-time
 > multiplayer rooms, a natural-language builder, fault analysis, and a small
@@ -63,9 +68,10 @@ license: mit
 
 ## Make it a real public website (free, ~5 minutes)
 
-The deploy button at the top of this README provisions everything on
-[Render's free tier](https://render.com). You get a real URL like
-`https://logicgate-xyz.onrender.com` that works from any phone or laptop.
+The repo ships with `render.yaml`, `fly.toml`, `Procfile`, and a `Dockerfile`
+— pick whichever host you prefer. The production deploy at
+[huggingface.co/spaces/sunooooooo/logicgate](https://huggingface.co/spaces/sunooooooo/logicgate)
+uses the Docker SDK (see [DEPLOY.md](DEPLOY.md)).
 
 **Or run it locally** for development only:
 
@@ -202,39 +208,67 @@ docker run -p 5000:5000 logicgate
 
 | Layer | Tech |
 |-------|------|
-| Backend | Flask 3.x, gunicorn |
+| Backend | Flask 3.x, gunicorn, Flask-SocketIO |
 | ML | scikit-learn (RandomForest, GradientBoosting, MLPClassifier, LogisticRegression, TF-IDF) |
-| Frontend | Vanilla JS, HTML5 Canvas, CSS Grid |
-| Persistence | JSON files (pluggable for DB) |
-| Deployment | Docker, Procfile, Heroku/Render/Fly.io compatible |
-| Testing | pytest |
-| CI | GitHub Actions |
+| Frontend | React 18 + TypeScript, Vite, Tailwind, HTML5 Canvas, Zustand |
+| Persistence | SQLite (auth + saved circuits + room state) |
+| Realtime | WebSocket rooms with presence, host kick, IP-ban list |
+| Deployment | Docker, Procfile, HuggingFace Spaces / Render / Fly.io / Railway |
+| Testing | pytest (91 tests, coverage gate ≥55%) |
+| CI | GitHub Actions: pytest+coverage, ruff, tsc, eslint, vite build, docker |
 
 ### Project layout
 
 ```
 logicgate/
-├── app.py                      Flask app and API routes
-├── simulator.py                Topological circuit evaluation
-├── templates/index.html        Single-page UI (HTML5 Canvas)
+├── app.py                      Flask app + API routes (CORS, rate limits)
+├── rate_limit.py               In-memory per-IP/per-user token bucket
+├── auth.py                     Username/password + Google OAuth (Authlib)
+├── realtime.py                 Flask-SocketIO rooms (presence, kick, ban)
+├── db.py                       SQLite schema + DAO (accounts, circuits, rooms)
+├── simulator.py                Topological circuit evaluator (Kahn's algorithm)
 ├── data/                       Training CSVs
-├── circuits/                   User-saved circuits (.json)
+├── circuits/                   Per-session saved circuits (.json)
+├── docs/model_cards/           Honest model cards (topology classifier etc.)
 ├── ml_models/
-│   ├── boolean_synth.py        Boolean expression → gate JSON
+│   ├── boolean_synth.py        Quine-McCluskey boolean → gate JSON
+│   ├── verilog_export.py       Gate JSON → synthesizable Verilog-2001 module
 │   ├── intent_classifier.py    TF-IDF + LR text router
 │   ├── question_solver.py      NL question → circuit (rule-based + ML)
-│   ├── fault_detector.py       RandomForest fault prediction
-│   ├── circuit_optimizer.py    MLP optimization scoring
-│   ├── gate_minimizer.py       Gate-count efficiency model
-│   ├── connection_suggester.py GBM next-wire ranker
-│   ├── nl_tt_model.py          NL→truth-table heuristic ML
-│   └── saved/                  Pickled trained models
-├── tests/                      pytest test suite
-├── Dockerfile
-├── Procfile                    For Heroku/Render
+│   ├── topology_classifier.py  RandomForest, 34 structural features
+│   ├── fault_detector.py       Rule-based + auxiliary MLP
+│   ├── circuit_optimizer.py    Structural analysis + MLP difficulty bucket
+│   ├── gate_minimizer.py       SOP minimization
+│   ├── connection_suggester.py Empirical P(src|dst,pin) table
+│   └── saved/                  Pickled trained models + metrics JSON
+├── frontend/                   React + TypeScript + Vite SPA
+│   ├── src/components/         Canvas, Header, Sidebar, RightPanel, …
+│   ├── src/panels/             PROPS, TRUTH, K-MAP, BOOL, SIG, LEDs, SMART
+│   ├── src/game/               Logic Arcade (Maze, Override, Canvas Challenge)
+│   └── src/store.ts            Zustand circuit state + undo/redo
+├── tests/                      pytest suite (boolean synth, NL stress,
+│                               simulator, API, topology, Verilog, rate limit)
+├── Dockerfile · Procfile · fly.toml · render.yaml
+├── pyproject.toml              ruff config (CI lint gate)
 ├── requirements.txt
 └── README.md
 ```
+
+### Performance — Quine-McCluskey synthesizer
+
+| Inputs (n) | Truth-table rows | Wall time (synth, ms) | Output gates |
+|-----------:|-----------------:|----------------------:|-------------:|
+|          4 |               16 |                    <1 |           ~8 |
+|          6 |               64 |                     2 |          ~22 |
+|          8 |              256 |                    14 |          ~55 |
+|         10 |             1024 |                   180 |         ~140 |
+|         12 |             4096 |                  2300 |         ~360 |
+
+Numbers from random truth tables on a Ryzen 5 5600U, single thread.
+QM is exponential in the worst case (≥13 vars hits memory ceilings on
+free-tier dynos), which is why the SMART panel caps interactive synthesis
+at 12 inputs. See [docs/model_cards/topology_classifier.md](docs/model_cards/topology_classifier.md)
+for a deeper writeup of the ML side.
 
 ## API Reference
 
@@ -263,6 +297,8 @@ logicgate/
 | POST   | `/api/analyze/minimize`    | Gate minimization                    |
 | POST   | `/api/analyze/full`        | All analyses in one response         |
 | POST   | `/api/predict`             | ML output prediction                 |
+| POST   | `/api/export/verilog`      | Circuit → synthesizable Verilog-2001 |
+| POST   | `/api/topology/classify`   | RandomForest topology label + probs  |
 
 ### Example: build a full adder using NAND
 
@@ -307,11 +343,17 @@ The repo is deploy-ready for:
 
 ## Roadmap
 
-- [ ] Sequential simulation with clock stepping (currently static)
-- [ ] Export to Verilog/VHDL
-- [ ] User accounts + cloud-saved circuits (Postgres)
-- [ ] React frontend (current vanilla JS works but is monolithic)
-- [ ] Karnaugh map visualization
+- [x] React + TypeScript frontend (Vite + Tailwind + Zustand)
+- [x] K-Map visualization (panel with Quine-McCluskey grouping)
+- [x] User accounts + cloud-saved circuits (SQLite + Google OAuth)
+- [x] Verilog-2001 export (`/api/export/verilog`, Header → **Verilog** button)
+- [x] Real-time multiplayer rooms (WebSocket presence, host kick, IP ban)
+- [x] Rate limiting + session gating on all mutating endpoints
+- [ ] **Sequential simulation with clock stepping** — engine + timing-diagram
+      panel. The Verilog export already emits `always @(posedge CLK)` blocks
+      for D-/JK-/T-FFs + REG4, but the in-browser simulator is still one-shot.
+- [ ] VHDL export (Verilog ships first; VHDL maps the same gate graph)
+- [ ] Postgres backend behind the same DAO (`db.py`) for multi-worker deploys
 - [ ] Real Kaggle-dataset-trained intent classifier (currently synthetic data)
 
 ## License

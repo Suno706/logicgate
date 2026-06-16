@@ -16,7 +16,7 @@ license: mit
 [![CI](https://github.com/Suno706/logicgate/actions/workflows/ci.yml/badge.svg)](https://github.com/Suno706/logicgate/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/flask-3.x-green.svg)](https://flask.palletsprojects.com/)
-[![React 18](https://img.shields.io/badge/react-18-blue.svg)](https://react.dev/)
+[![React 19](https://img.shields.io/badge/react-19-blue.svg)](https://react.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 <!-- TODO: drop a ~15s screen-capture of the canvas → truth-table → Verilog flow here. -->
@@ -210,7 +210,7 @@ docker run -p 5000:5000 logicgate
 |-------|------|
 | Backend | Flask 3.x, gunicorn, Flask-SocketIO |
 | ML | scikit-learn (RandomForest, GradientBoosting, MLPClassifier, LogisticRegression, TF-IDF) |
-| Frontend | React 18 + TypeScript, Vite, Tailwind, HTML5 Canvas, Zustand |
+| Frontend | React 19 + TypeScript, Vite, Tailwind, HTML5 Canvas |
 | Persistence | SQLite (auth + saved circuits + room state) |
 | Realtime | WebSocket rooms with presence, host kick, IP-ban list |
 | Deployment | Docker, Procfile, HuggingFace Spaces / Render / Fly.io / Railway |
@@ -245,7 +245,7 @@ logicgate/
 │   ├── src/components/         Canvas, Header, Sidebar, RightPanel, …
 │   ├── src/panels/             PROPS, TRUTH, K-MAP, BOOL, SIG, LEDs, SMART
 │   ├── src/game/               Logic Arcade (Maze, Override, Canvas Challenge)
-│   └── src/store.ts            Zustand circuit state + undo/redo
+│   └── src/store.ts            Circuit state + undo/redo
 ├── tests/                      pytest suite (boolean synth, NL stress,
 │                               simulator, API, topology, Verilog, rate limit)
 ├── Dockerfile · Procfile · fly.toml · render.yaml
